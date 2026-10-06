@@ -9,7 +9,7 @@ export function askForDuck(container: HTMLElement): Promise<DuckId> {
     <form class="login-card" autocomplete="off">
       <div class="login-duck">🦆</div>
       <h1>Say it with Quack</h1>
-      <p>Escribe tu código secreto para saber qué pato eres</p>
+      <p>Hola chavito, hice esto con mucho amor, espero verte aquí seguido. Solo pon tu código super secreto &lt;3</p>
       <input name="code" type="password" placeholder="Código secreto" autocapitalize="off" autocorrect="off" spellcheck="false" />
       <button type="submit">Entrar al estanque</button>
       <p class="login-error" hidden>Ese código no es de ningún pato</p>
