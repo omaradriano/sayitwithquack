@@ -62,7 +62,10 @@ export class Connection {
     return this.closedByServer;
   }
 
-  send(msg: ClientMessage) {
-    if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(msg));
+  /** Devuelve false si no hay conexión y el mensaje no se pudo enviar. */
+  send(msg: ClientMessage): boolean {
+    if (this.ws?.readyState !== WebSocket.OPEN) return false;
+    this.ws.send(JSON.stringify(msg));
+    return true;
   }
 }

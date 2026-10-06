@@ -11,7 +11,9 @@ import { DuckLabel, createLabelRenderer } from "./ui/labels";
 import { askForDuck } from "./ui/login";
 import { Joystick } from "./ui/joystick";
 import { PresenceBadge } from "./ui/presence";
+import { SettingsMenu } from "./ui/settings";
 import { Connection } from "./net/connection";
+import type { DuckConfig } from "./net/protocol";
 import { clearSession, loadSession } from "./session";
 import { COLORS, DUCKS, WS_URL, type DuckId } from "./config";
 
@@ -97,6 +99,27 @@ function enterAs(
     onEnd: () => mine.endManual(),
   });
 
+  // Configuración (colores + mensaje) de cada pato; arranca con los colores de config.ts.
+  const configs = new Map<DuckId, DuckConfig>(
+    DUCKS.map((d) => [d.id, { body: d.body, wing: d.wing, head: d.head, message: "" }]),
+  );
+  function applyConfig(id: DuckId, cfg: DuckConfig) {
+    configs.set(id, cfg);
+    swimmers.get(id)!.duck.setColors(cfg);
+    duckLabels.get(id)!.setMessage(cfg.message);
+  }
+
+  // Menú ☰: configura solo tu pato.
+  new SettingsMenu({
+    current: () => configs.get(me)!,
+    preview: (colors) => mine.duck.setColors(colors),
+    save(values) {
+      if (!conn.send({ t: "config", ...values })) return false;
+      applyConfig(me, values);
+      return true;
+    },
+  });
+
   /** Pone "en línea" / "visto ..." en la etiqueta de cada pato. */
   function updateLabels(online: DuckId[], lastSeen: Partial<Record<DuckId, number>>) {
     for (const [id, label] of duckLabels) {
@@ -124,6 +147,9 @@ function enterAs(
           presence.show(here ? `${partnerName} está en el estanque 💛` : `${partnerName} no está en el estanque`, here);
           if (!here && partner.mode === "remote") partner.releaseRemote();
           if (msg.t === "welcome") {
+            for (const [id, cfg] of Object.entries(msg.configs ?? {})) {
+              if (cfg && configs.has(id as DuckId)) applyConfig(id as DuckId, cfg);
+            }
             const own = msg.states[me];
             if (own) mine.restore(own);
             const theirs = msg.states[partnerId];
@@ -133,6 +159,9 @@ function enterAs(
         }
         case "state":
           if (msg.duck === partnerId) partner.applyRemote(msg);
+          break;
+        case "config":
+          if (configs.has(msg.duck)) applyConfig(msg.duck, msg);
           break;
       }
     },

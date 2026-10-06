@@ -12,8 +12,20 @@ export interface DuckState {
   m: boolean;
 }
 
+/** Personalización de un pato. */
+export interface DuckConfig {
+  body: string; // "#rrggbb"
+  wing: string;
+  head: string;
+  /** mensaje personalizado (máx. 60 caracteres, puede ir vacío) */
+  message: string;
+}
+
 // Cliente → servidor
-export type ClientMessage = { t: "hello"; duck: DuckId } | ({ t: "state" } & DuckState);
+export type ClientMessage =
+  | { t: "hello"; duck: DuckId }
+  | ({ t: "state" } & DuckState)
+  | ({ t: "config" } & DuckConfig);
 
 // Servidor → cliente
 export type ServerMessage =
@@ -23,6 +35,8 @@ export type ServerMessage =
       /** ms Unix de la última desconexión de cada pato */
       lastSeen: Partial<Record<DuckId, number>>;
       states: Partial<Record<DuckId, DuckState>>;
+      configs: Partial<Record<DuckId, DuckConfig>>;
     }
   | { t: "presence"; online: DuckId[]; lastSeen: Partial<Record<DuckId, number>> }
-  | ({ t: "state"; duck: DuckId } & DuckState);
+  | ({ t: "state"; duck: DuckId } & DuckState)
+  | ({ t: "config"; duck: DuckId } & DuckConfig);

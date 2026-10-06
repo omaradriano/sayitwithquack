@@ -10,14 +10,19 @@ import {
 } from "three";
 import type { Updatable } from "../core/loop";
 
-export interface DuckOptions {
-  name: string;
+export interface DuckColors {
   body: string;
   wing: string;
   head: string;
 }
 
-// Las geometrías y materiales se comparten entre patos: menos memoria y menos trabajo para la GPU.
+export interface DuckOptions extends DuckColors {
+  name: string;
+}
+
+// Las geometrías se comparten entre patos: menos memoria y menos trabajo para la GPU.
+// Los materiales de pico y ojos también; los de cuerpo, alas y cabeza son de cada pato
+// para poder cambiarles el color.
 const geo = {
   body: new BoxGeometry(0.5, 0.3, 0.72),
   tail: new ConeGeometry(0.16, 0.3, 4),
@@ -28,18 +33,12 @@ const geo = {
   eye: new BoxGeometry(0.04, 0.06, 0.04),
   ripple: new RingGeometry(0.42, 0.47, 20),
 };
-const materials = new Map<string, MeshStandardMaterial>();
-function mat(color: string) {
-  let m = materials.get(color);
-  if (!m) {
-    m = new MeshStandardMaterial({ color, flatShading: true, roughness: 0.8 });
-    materials.set(color, m);
-  }
-  return m;
-}
+const mat = (color: string) => new MeshStandardMaterial({ color, flatShading: true, roughness: 0.8 });
+const beak = mat("#f39c34");
+const eye = mat("#1b1b1b");
 
-function part(g: BufferGeometry, color: string, x: number, y: number, z: number) {
-  const m = new Mesh(g, mat(color));
+function part(g: BufferGeometry, material: MeshStandardMaterial, x: number, y: number, z: number) {
+  const m = new Mesh(g, material);
   m.position.set(x, y, z);
   m.castShadow = true;
   return m;
@@ -61,11 +60,13 @@ export class Duck extends Group implements Updatable {
   label?: HTMLElement;
   private phase = Math.random() * Math.PI * 2;
   private ripple: Mesh<RingGeometry, MeshBasicMaterial>;
+  private colors: Record<keyof DuckColors, MeshStandardMaterial>;
 
   constructor(opts: DuckOptions) {
     super();
     this.name = opts.name;
-    const { body, wing, head } = opts;
+    this.colors = { body: mat(opts.body), wing: mat(opts.wing), head: mat(opts.head) };
+    const { body, wing, head } = this.colors;
 
     const tail = part(geo.tail, body, 0, 0.24, -0.4);
     tail.rotation.set(-1.1, Math.PI / 4, 0);
@@ -77,9 +78,9 @@ export class Duck extends Group implements Updatable {
       part(geo.wing, wing, -0.27, 0.15, -0.04),
       part(geo.neck, head, 0, 0.28, 0.22),
       part(geo.head, head, 0, 0.45, 0.24),
-      part(geo.beak, "#f39c34", 0, 0.42, 0.46),
-      part(geo.eye, "#1b1b1b", 0.142, 0.5, 0.31),
-      part(geo.eye, "#1b1b1b", -0.142, 0.5, 0.31),
+      part(geo.beak, beak, 0, 0.42, 0.46),
+      part(geo.eye, eye, 0.142, 0.5, 0.31),
+      part(geo.eye, eye, -0.142, 0.5, 0.31),
     );
     this.model.scale.setScalar(1.2);
     this.add(this.model);
@@ -92,6 +93,22 @@ export class Duck extends Group implements Updatable {
     this.ripple.rotation.x = -Math.PI / 2;
     this.ripple.position.y = 0.02;
     this.add(this.ripple);
+  }
+
+  /** Cambia los colores al instante: basta con actualizar los materiales. */
+  setColors(c: DuckColors) {
+    this.colors.body.color.set(c.body);
+    this.colors.wing.color.set(c.wing);
+    this.colors.head.color.set(c.head);
+  }
+
+  /** Colores actuales en formato "#rrggbb". */
+  getColors(): DuckColors {
+    return {
+      body: `#${this.colors.body.color.getHexString()}`,
+      wing: `#${this.colors.wing.color.getHexString()}`,
+      head: `#${this.colors.head.color.getHexString()}`,
+    };
   }
 
   tick(_delta: number, t: number) {

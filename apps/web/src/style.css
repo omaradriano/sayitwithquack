@@ -255,3 +255,177 @@ body {
 .duck-label.is-offline::before {
   background: #9a8f6a;
 }
+
+/* ---------- Mensaje en la etiqueta ---------- */
+.duck-label.is-message {
+  max-width: 170px;
+  white-space: normal;
+  text-align: center;
+  line-height: 1.3;
+}
+
+/* ---------- Menú de configuración ---------- */
+.burger {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 10px);
+  right: 12px;
+  z-index: 6;
+  display: grid;
+  place-content: center;
+  gap: 4px;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: rgba(20, 50, 50, 0.55);
+  cursor: pointer;
+}
+
+.burger span {
+  display: block;
+  width: 18px;
+  height: 2px;
+  border-radius: 2px;
+  background: #fff;
+}
+
+.settings-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 7;
+  background: rgba(10, 30, 30, 0.35);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s;
+}
+
+.settings {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 8;
+  display: flex;
+  flex-direction: column;
+  width: min(320px, 88vw);
+  box-sizing: border-box;
+  padding: calc(env(safe-area-inset-top, 0px) + 16px) 18px 0;
+  background: #fffaf0;
+  color: #2b3b3b;
+  box-shadow: -8px 0 24px rgba(0, 0, 0, 0.2);
+  overflow-y: auto;
+  transform: translateX(105%);
+  transition: transform 0.25s ease;
+}
+
+body.settings-open .settings {
+  transform: none;
+}
+
+body.settings-open .settings-backdrop {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.settings header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.settings h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.settings h3 {
+  margin: 20px 0 8px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.6;
+}
+
+.settings-close {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 8px;
+  background: #efe6d2;
+  color: inherit;
+  font-size: 14px;
+}
+
+.color-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid #efe6d2;
+  font-size: 14px;
+}
+
+.color-row input[type="color"] {
+  width: 56px;
+  height: 34px;
+  padding: 0;
+  border: 2px solid #d9cfb8;
+  border-radius: 8px;
+  background: none;
+}
+
+.settings-hint {
+  margin: -4px 0 8px;
+  font-size: 11px;
+  opacity: 0.6;
+}
+
+.settings textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px;
+  border: 2px solid #d9cfb8;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 16px; /* evita el zoom de Safari iOS */
+  resize: none;
+}
+
+.settings-counter {
+  margin-top: 4px;
+  text-align: right;
+  font-size: 11px;
+  opacity: 0.6;
+}
+
+.settings-footer {
+  position: sticky;
+  bottom: 0;
+  margin-top: auto;
+  padding: 16px 0 calc(env(safe-area-inset-bottom, 0px) + 16px);
+  background: #fffaf0;
+}
+
+.settings-error {
+  margin: 0 0 8px;
+  color: #c0392b;
+  font-size: 12px;
+}
+
+.settings-save {
+  width: 100%;
+  padding: 14px;
+  border: 0;
+  border-radius: 12px;
+  background: #ffd84d;
+  color: #3a2a00;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.settings-save:disabled {
+  background: #9ee2b0;
+  color: #0f4020;
+}

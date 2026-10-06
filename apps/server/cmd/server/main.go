@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/omaradriano/sayitwithquack/server/internal/hub"
+	"github.com/omaradriano/sayitwithquack/server/internal/store"
 )
 
 // env lee una variable de entorno con valor por defecto.
@@ -37,12 +38,23 @@ func main() {
 		list(os.Getenv("ALLOWED_ORIGINS"))...,
 	)
 
+	// Dónde se guarda state.json. En Railway: un volumen montado en /data.
+	dataDir := env("DATA_DIR", "data")
+	st, err := store.New(dataDir)
+	if err != nil {
+		log.Fatalf("store: %v", err)
+	}
+	h, err := hub.New(ducks, origins, st)
+	if err != nil {
+		log.Fatalf("hub: %v", err)
+	}
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("quack"))
 	})
-	mux.Handle("GET /ws", hub.New(ducks, origins))
+	mux.Handle("GET /ws", h)
 
-	log.Printf("server listening on :%s (ducks=%v origins=%v)", port, ducks, origins)
+	log.Printf("server listening on :%s (ducks=%v origins=%v data=%s)", port, ducks, origins, dataDir)
 	log.Fatal(http.ListenAndServe(":"+port, mux))
 }

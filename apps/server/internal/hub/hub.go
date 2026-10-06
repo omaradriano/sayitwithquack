@@ -7,15 +7,23 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"regexp"
 	"slices"
+	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/coder/websocket"
 	"github.com/coder/websocket/wsjson"
 
 	"github.com/omaradriano/sayitwithquack/server/internal/protocol"
+	"github.com/omaradriano/sayitwithquack/server/internal/store"
 )
+
+const maxMessage = 60 // caracteres del mensaje personalizado
+
+var hexColor = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
 
 // client es una conexión websocket abierta de un pato.
 type client struct {
@@ -29,22 +37,27 @@ type Hub struct {
 	ducks   []string // ids válidos
 	origins []string // patrones de Origin permitidos
 
+	store *store.Store
+
 	mu      sync.Mutex
-	clients map[string]*client        // un cliente por pato
-	last    map[string]protocol.State // última posición conocida de cada pato
-	// lastSeen guarda cuándo se desconectó cada pato (ms Unix). Vive en memoria:
-	// se pierde si el servidor se reinicia o se vuelve a desplegar.
-	lastSeen map[string]int64
+	clients map[string]*client // un cliente por pato
+	// data: configuración, última conexión y última posición de cada pato.
+	// Se guarda en disco al cambiar la configuración o cuando alguien se va.
+	data *store.Data
 }
 
-func New(ducks, origins []string) *Hub {
-	return &Hub{
-		ducks:    ducks,
-		origins:  origins,
-		clients:  map[string]*client{},
-		last:     map[string]protocol.State{},
-		lastSeen: map[string]int64{},
+func New(ducks, origins []string, st *store.Store) (*Hub, error) {
+	data, err := st.Load()
+	if err != nil {
+		return nil, err
 	}
+	return &Hub{
+		ducks:   ducks,
+		origins: origins,
+		store:   st,
+		clients: map[string]*client{},
+		data:    data,
+	}, nil
 }
 
 // ServeHTTP acepta la conexión websocket y la atiende hasta que se cierra.
@@ -108,6 +121,12 @@ func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 			s.Duck = c.duck // nunca confiamos en el duck que diga el mensaje
 			h.updateState(c, s)
+		case "config":
+			var cfg protocol.Config
+			if json.Unmarshal(data, &cfg) != nil {
+				continue
+			}
+			h.updateConfig(c, cfg)
 		}
 	}
 }
@@ -124,11 +143,13 @@ func (h *Hub) join(c *client) {
 	log.Printf("%s entró", c.duck)
 
 	// Incluye también tu propio último estado: si recargas, tu pato sigue donde estaba.
-	states := map[string]protocol.State{}
-	for duck, s := range h.last {
-		states[duck] = s
-	}
-	h.queue(c, protocol.Welcome{T: "welcome", Online: h.onlineLocked(), LastSeen: h.lastSeen, States: states})
+	h.queue(c, protocol.Welcome{
+		T:        "welcome",
+		Online:   h.onlineLocked(),
+		LastSeen: h.data.LastSeen,
+		States:   h.data.States,
+		Configs:  h.data.Configs,
+	})
 	h.broadcastLocked(h.presenceLocked(), c)
 }
 
@@ -140,7 +161,8 @@ func (h *Hub) leave(c *client) {
 	}
 	delete(h.clients, c.duck)
 	close(c.send)
-	h.lastSeen[c.duck] = time.Now().UnixMilli()
+	h.data.LastSeen[c.duck] = time.Now().UnixMilli()
+	h.saveLocked()
 	log.Printf("%s salió", c.duck)
 	h.broadcastLocked(h.presenceLocked(), nil)
 }
@@ -151,8 +173,38 @@ func (h *Hub) updateState(c *client, s protocol.State) {
 	if h.clients[c.duck] != c {
 		return
 	}
-	h.last[c.duck] = s
+	h.data.States[c.duck] = s // en memoria; se guarda en disco al salir
 	h.broadcastLocked(s, c)
+}
+
+func (h *Hub) updateConfig(c *client, cfg protocol.Config) {
+	// Validamos: colores #rrggbb y mensaje corto.
+	if !hexColor.MatchString(cfg.Body) || !hexColor.MatchString(cfg.Wing) || !hexColor.MatchString(cfg.Head) {
+		return
+	}
+	cfg.T = "config"
+	cfg.Duck = c.duck
+	cfg.Message = strings.TrimSpace(cfg.Message)
+	if utf8.RuneCountInString(cfg.Message) > maxMessage {
+		cfg.Message = string([]rune(cfg.Message)[:maxMessage])
+	}
+
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.clients[c.duck] != c {
+		return
+	}
+	h.data.Configs[c.duck] = cfg
+	h.saveLocked()
+	log.Printf("%s guardó su configuración", c.duck)
+	h.broadcastLocked(cfg, c)
+}
+
+// saveLocked escribe el estado a disco. Requiere h.mu.
+func (h *Hub) saveLocked() {
+	if err := h.store.Save(h.data); err != nil {
+		log.Printf("no se pudo guardar el estado: %v", err)
+	}
 }
 
 // broadcastLocked manda msg a todos menos a except. Requiere h.mu.
@@ -178,7 +230,7 @@ func (h *Hub) queue(c *client, msg any) {
 }
 
 func (h *Hub) presenceLocked() protocol.Presence {
-	return protocol.Presence{T: "presence", Online: h.onlineLocked(), LastSeen: h.lastSeen}
+	return protocol.Presence{T: "presence", Online: h.onlineLocked(), LastSeen: h.data.LastSeen}
 }
 
 func (h *Hub) onlineLocked() []string {

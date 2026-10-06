@@ -25,12 +25,24 @@ type State struct {
 	M    bool    `json:"m"` // true = lo están moviendo a mano
 }
 
+// Config es la personalización de un pato (colores y mensaje).
+// El cliente la manda sin Duck; el servidor le pone el Duck de quien la envió.
+type Config struct {
+	T       string `json:"t,omitempty"` // "config"
+	Duck    string `json:"duck,omitempty"`
+	Body    string `json:"body"`
+	Wing    string `json:"wing"`
+	Head    string `json:"head"`
+	Message string `json:"message"`
+}
+
 // Welcome confirma la conexión e incluye quién está y dónde está cada pato.
 type Welcome struct {
-	T        string           `json:"t"` // "welcome"
-	Online   []string         `json:"online"`
-	LastSeen map[string]int64 `json:"lastSeen"` // ms Unix de la última desconexión
-	States   map[string]State `json:"states"`
+	T        string            `json:"t"` // "welcome"
+	Online   []string          `json:"online"`
+	LastSeen map[string]int64  `json:"lastSeen"` // ms Unix de la última desconexión
+	States   map[string]State  `json:"states"`
+	Configs  map[string]Config `json:"configs"`
 }
 
 // Presence avisa cuando alguien entra o sale.

@@ -32,15 +32,20 @@ function statusText(p: Exclude<Presence, null>) {
   return p.lastSeen ? `visto ${formatLastSeen(p.lastSeen)}` : "desconectado";
 }
 
+type Phase = "name" | "status" | "message";
+const PHASES: Phase[] = ["name", "status", "message"];
+
 /**
- * Etiqueta con el nombre del pato. Cuando sabemos su estado, alterna cada 5 s
- * entre el nombre y "en línea" / "visto hoy 2:32 p.m.".
+ * Etiqueta con el nombre del pato. Cada 5 s pasa a la siguiente fase:
+ * nombre → "en línea" / "visto hoy 2:32 p.m." → mensaje personalizado.
+ * Las fases sin contenido (sin conexión, sin mensaje) se saltan.
  */
 export class DuckLabel {
   readonly el: HTMLDivElement;
   private text: HTMLSpanElement;
   private presence: Presence = null;
-  private showingStatus = false;
+  private message = "";
+  private phase: Phase = "name";
 
   constructor(
     target: Object3D,
@@ -61,30 +66,53 @@ export class DuckLabel {
     label.position.set(0, height, 0);
     target.add(label);
 
-    setInterval(() => this.swap(), SWAP_EVERY);
+    setInterval(() => this.next(), SWAP_EVERY);
   }
 
   setPresence(p: Presence) {
     this.presence = p;
     this.el.classList.toggle("is-online", p?.online === true);
     this.el.classList.toggle("is-offline", p?.online === false);
-    if (!p) this.showingStatus = false;
     this.render();
   }
 
-  private swap() {
-    if (!this.presence) return;
+  setMessage(message: string) {
+    this.message = message.trim();
+    this.render();
+  }
+
+  private available(phase: Phase) {
+    if (phase === "status") return this.presence !== null;
+    if (phase === "message") return this.message !== "";
+    return true;
+  }
+
+  private next() {
+    const i = PHASES.indexOf(this.phase);
+    // Busca la siguiente fase con contenido (vuelve a "name" si no hay otra).
+    let next: Phase = "name";
+    for (let k = 1; k <= PHASES.length; k++) {
+      const candidate = PHASES[(i + k) % PHASES.length];
+      if (this.available(candidate)) {
+        next = candidate;
+        break;
+      }
+    }
+    if (next === this.phase) return;
     // Desvanece, cambia el texto y vuelve a aparecer.
     this.text.classList.add("fading");
     setTimeout(() => {
-      this.showingStatus = !this.showingStatus;
+      this.phase = next;
       this.render();
       this.text.classList.remove("fading");
     }, FADE);
   }
 
   private render() {
-    this.text.textContent =
-      this.showingStatus && this.presence ? statusText(this.presence) : this.name;
+    if (!this.available(this.phase)) this.phase = "name";
+    this.el.classList.toggle("is-message", this.phase === "message");
+    if (this.phase === "status" && this.presence) this.text.textContent = statusText(this.presence);
+    else if (this.phase === "message") this.text.textContent = `💬 ${this.message}`;
+    else this.text.textContent = this.name;
   }
 }
