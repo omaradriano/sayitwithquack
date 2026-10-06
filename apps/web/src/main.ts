@@ -7,7 +7,7 @@ import { Pond } from "./world/pond";
 import { Duck } from "./world/duck";
 import { Decor } from "./world/decor";
 import { Swimmer, Couple } from "./behaviors/swim";
-import { addLabel, createLabelRenderer } from "./ui/labels";
+import { DuckLabel, createLabelRenderer } from "./ui/labels";
 import { askForDuck } from "./ui/login";
 import { Joystick } from "./ui/joystick";
 import { PresenceBadge } from "./ui/presence";
@@ -33,9 +33,12 @@ function start() {
   scene.add(pond, decor);
 
   const swimmers = new Map<DuckId, Swimmer>();
+  const duckLabels = new Map<DuckId, DuckLabel>();
   for (const opts of DUCKS) {
     const duck = new Duck(opts);
-    duck.label = addLabel(duck, opts.name);
+    const label = new DuckLabel(duck, opts.name);
+    duck.label = label.el;
+    duckLabels.set(opts.id, label);
     scene.add(duck);
     swimmers.set(opts.id, new Swimmer(duck));
   }
@@ -71,12 +74,17 @@ function start() {
   // Mientras no sepamos quién eres, los dos patos nadan solos detrás del login.
   const saved = loadSession();
   (saved ? Promise.resolve(saved) : askForDuck(container)).then((me) => {
-    enterAs(me, swimmers, loop);
+    enterAs(me, swimmers, duckLabels, loop);
   });
 }
 
 /** Ya sabemos qué pato eres: joystick + conexión en vivo. */
-function enterAs(me: DuckId, swimmers: Map<DuckId, Swimmer>, loop: Loop) {
+function enterAs(
+  me: DuckId,
+  swimmers: Map<DuckId, Swimmer>,
+  duckLabels: Map<DuckId, DuckLabel>,
+  loop: Loop,
+) {
   const mine = swimmers.get(me)!;
   const partnerId = DUCKS.find((d) => d.id !== me)!.id;
   const partner = swimmers.get(partnerId)!;
@@ -89,8 +97,17 @@ function enterAs(me: DuckId, swimmers: Map<DuckId, Swimmer>, loop: Loop) {
     onEnd: () => mine.endManual(),
   });
 
+  /** Pone "en línea" / "visto ..." en la etiqueta de cada pato. */
+  function updateLabels(online: DuckId[], lastSeen: Partial<Record<DuckId, number>>) {
+    for (const [id, label] of duckLabels) {
+      label.setPresence(online.includes(id) ? { online: true } : { online: false, lastSeen: lastSeen[id] });
+    }
+  }
+
   const conn = new Connection(WS_URL, me, {
     onStatus(status) {
+      // Sin conexión no sabemos el estado real: las etiquetas muestran solo el nombre.
+      if (status !== "online") for (const label of duckLabels.values()) label.setPresence(null);
       if (status === "connecting") presence.show("Conectando…", false);
       if (status === "offline") {
         // Sin conexión, el pato de tu pareja vuelve a nadar solo en tu pantalla.
@@ -102,6 +119,7 @@ function enterAs(me: DuckId, swimmers: Map<DuckId, Swimmer>, loop: Loop) {
       switch (msg.t) {
         case "welcome":
         case "presence": {
+          updateLabels(msg.online, msg.lastSeen ?? {});
           const here = msg.online.includes(partnerId);
           presence.show(here ? `${partnerName} está en el estanque 💛` : `${partnerName} no está en el estanque`, here);
           if (!here && partner.mode === "remote") partner.releaseRemote();

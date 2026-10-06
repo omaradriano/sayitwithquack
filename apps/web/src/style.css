@@ -237,3 +237,21 @@ body {
 [hidden] {
   display: none !important;
 }
+
+/* ---------- Estado en la etiqueta ---------- */
+.label-text {
+  transition: opacity 0.2s;
+}
+
+.label-text.fading {
+  opacity: 0;
+}
+
+.duck-label.is-online::before {
+  background: #1fa64a;
+  box-shadow: 0 0 5px #7dff9b;
+}
+
+.duck-label.is-offline::before {
+  background: #9a8f6a;
+}

@@ -32,14 +32,18 @@ type Hub struct {
 	mu      sync.Mutex
 	clients map[string]*client        // un cliente por pato
 	last    map[string]protocol.State // última posición conocida de cada pato
+	// lastSeen guarda cuándo se desconectó cada pato (ms Unix). Vive en memoria:
+	// se pierde si el servidor se reinicia o se vuelve a desplegar.
+	lastSeen map[string]int64
 }
 
 func New(ducks, origins []string) *Hub {
 	return &Hub{
-		ducks:   ducks,
-		origins: origins,
-		clients: map[string]*client{},
-		last:    map[string]protocol.State{},
+		ducks:    ducks,
+		origins:  origins,
+		clients:  map[string]*client{},
+		last:     map[string]protocol.State{},
+		lastSeen: map[string]int64{},
 	}
 }
 
@@ -124,8 +128,8 @@ func (h *Hub) join(c *client) {
 	for duck, s := range h.last {
 		states[duck] = s
 	}
-	h.queue(c, protocol.Welcome{T: "welcome", Online: h.onlineLocked(), States: states})
-	h.broadcastLocked(protocol.Presence{T: "presence", Online: h.onlineLocked()}, c)
+	h.queue(c, protocol.Welcome{T: "welcome", Online: h.onlineLocked(), LastSeen: h.lastSeen, States: states})
+	h.broadcastLocked(h.presenceLocked(), c)
 }
 
 func (h *Hub) leave(c *client) {
@@ -136,8 +140,9 @@ func (h *Hub) leave(c *client) {
 	}
 	delete(h.clients, c.duck)
 	close(c.send)
+	h.lastSeen[c.duck] = time.Now().UnixMilli()
 	log.Printf("%s salió", c.duck)
-	h.broadcastLocked(protocol.Presence{T: "presence", Online: h.onlineLocked()}, nil)
+	h.broadcastLocked(h.presenceLocked(), nil)
 }
 
 func (h *Hub) updateState(c *client, s protocol.State) {
@@ -170,6 +175,10 @@ func (h *Hub) queue(c *client, msg any) {
 	case c.send <- data:
 	default:
 	}
+}
+
+func (h *Hub) presenceLocked() protocol.Presence {
+	return protocol.Presence{T: "presence", Online: h.onlineLocked(), LastSeen: h.lastSeen}
 }
 
 func (h *Hub) onlineLocked() []string {

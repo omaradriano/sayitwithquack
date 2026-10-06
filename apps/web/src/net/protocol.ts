@@ -17,6 +17,12 @@ export type ClientMessage = { t: "hello"; duck: DuckId } | ({ t: "state" } & Duc
 
 // Servidor → cliente
 export type ServerMessage =
-  | { t: "welcome"; online: DuckId[]; states: Partial<Record<DuckId, DuckState>> }
-  | { t: "presence"; online: DuckId[] }
+  | {
+      t: "welcome";
+      online: DuckId[];
+      /** ms Unix de la última desconexión de cada pato */
+      lastSeen: Partial<Record<DuckId, number>>;
+      states: Partial<Record<DuckId, DuckState>>;
+    }
+  | { t: "presence"; online: DuckId[]; lastSeen: Partial<Record<DuckId, number>> }
   | ({ t: "state"; duck: DuckId } & DuckState);

@@ -27,13 +27,15 @@ type State struct {
 
 // Welcome confirma la conexión e incluye quién está y dónde está cada pato.
 type Welcome struct {
-	T      string           `json:"t"` // "welcome"
-	Online []string         `json:"online"`
-	States map[string]State `json:"states"`
+	T        string           `json:"t"` // "welcome"
+	Online   []string         `json:"online"`
+	LastSeen map[string]int64 `json:"lastSeen"` // ms Unix de la última desconexión
+	States   map[string]State `json:"states"`
 }
 
 // Presence avisa cuando alguien entra o sale.
 type Presence struct {
-	T      string   `json:"t"` // "presence"
-	Online []string `json:"online"`
+	T        string           `json:"t"` // "presence"
+	Online   []string         `json:"online"`
+	LastSeen map[string]int64 `json:"lastSeen"`
 }
