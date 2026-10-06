@@ -1,6 +1,7 @@
 {
   "name": "sayitwithquack",
   "private": true,
+  "packageManager": "pnpm@10.34.1",
   "scripts": {
     "dev": "pnpm --filter web dev",
     "dev:server": "cd apps/server && go run ./cmd/server",
