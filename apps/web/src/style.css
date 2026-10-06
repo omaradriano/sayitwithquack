@@ -1,0 +1,58 @@
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none; /* evita el "rebote" de iOS */
+  background: #2b5d4f;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+#app {
+  position: fixed;
+  inset: 0;
+  height: 100dvh; /* alto real visible en Safari iOS */
+  touch-action: none; /* sin zoom por doble tap ni scroll */
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+#app canvas {
+  display: block;
+}
+
+.labels {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.duck-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 7px;
+  border-radius: 4px;
+  background: #ffd84d;
+  color: #3a2a00;
+  font-size: 11px;
+  font-weight: 600;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.15);
+}
+
+.duck-label::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.fallback {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  padding: 24px;
+  color: #fff;
+  text-align: center;
+}

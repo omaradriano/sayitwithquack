@@ -1,0 +1,10 @@
+{
+  "name": "sayitwithquack",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --filter web dev",
+    "dev:server": "cd apps/server && go run ./cmd/server",
+    "build": "pnpm --filter web build",
+    "typecheck": "pnpm --filter web typecheck"
+  }
+}
