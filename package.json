@@ -6,6 +6,7 @@
     "dev": "pnpm --filter web dev",
     "dev:server": "cd apps/server && go run ./cmd/server",
     "build": "pnpm --filter web build",
-    "typecheck": "pnpm --filter web typecheck"
+    "typecheck": "pnpm --filter web typecheck",
+    "deploy:server": "railway up apps/server --path-as-root --service server --ci"
   }
 }

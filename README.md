@@ -15,6 +15,11 @@ pnpm dev          # web en http://localhost:5173 (y en tu IP local para el iPhon
 pnpm dev:server   # Go en http://localhost:8080 (/healthz)
 ```
 
+## Despliegue
+
+- **Web (Vercel):** se despliega sola con cada push a `main` → https://sayitwithquack.vercel.app (config en `vercel.json`).
+- **Servidor (Railway):** `pnpm deploy:server` → https://server-production-20c4.up.railway.app/healthz (config en `apps/server/railway.toml`).
+
 Personaliza nombres y colores de los patos en `apps/web/src/config.ts`.
 
 ## Mapa del código (web)
