@@ -6,7 +6,7 @@ export default defineConfig({
     host: true,
     proxy: {
       // En local, /ws se redirige al servidor Go.
-      "/ws": { target: "ws://localhost:8080", ws: true },
+      "/ws": { target: "ws://localhost:8787", ws: true },
     },
   },
 });

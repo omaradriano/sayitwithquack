@@ -55,6 +55,10 @@ export class Duck extends Group implements Updatable {
   readonly model = new Group();
   /** 0 = quieto, 1 = nadando a máxima velocidad. Lo actualiza el nado. */
   moving = 0;
+  /** true mientras alguien lo mueve con el joystick. Lo actualiza el nado. */
+  manual = false;
+  /** Etiqueta HTML con el nombre (la crea ui/labels). */
+  label?: HTMLElement;
   private phase = Math.random() * Math.PI * 2;
   private ripple: Mesh<RingGeometry, MeshBasicMaterial>;
 
@@ -100,5 +104,8 @@ export class Duck extends Group implements Updatable {
     const k = (t * 0.7 + p) % 1;
     this.ripple.scale.setScalar(1 + k * 1.1);
     this.ripple.material.opacity = (1 - k) * (0.15 + this.moving * 0.35);
+
+    // Indicador de "lo están moviendo a mano".
+    this.label?.classList.toggle("is-manual", this.manual);
   }
 }

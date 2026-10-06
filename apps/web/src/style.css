@@ -56,3 +56,184 @@ body {
   color: #fff;
   text-align: center;
 }
+
+/* ---------- Indicador de control manual ---------- */
+.duck-label {
+  position: relative;
+  transition: background 0.2s;
+}
+
+.duck-label.is-manual {
+  background: #ff8fab;
+  color: #4a0f22;
+}
+
+.manual-badge {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 6px);
+  transform: translateX(-50%);
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #4a0f22;
+  font-size: 10px;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.duck-label.is-manual .manual-badge {
+  opacity: 1;
+  animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  50% {
+    transform: translateX(-50%) translateY(-2px);
+  }
+}
+
+/* ---------- Joystick ---------- */
+.joystick {
+  position: fixed;
+  width: 112px;
+  height: 112px;
+  margin: -56px 0 0 -56px; /* centrado en el dedo */
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.18);
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  pointer-events: none;
+  z-index: 5;
+}
+
+.joystick-knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 48px;
+  height: 48px;
+  margin: -24px 0 0 -24px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+/* ---------- Presencia ---------- */
+.presence {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 12px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(20, 50, 50, 0.55);
+  color: #fff;
+  font-size: 11px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 4;
+}
+
+.presence::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #b9c4c4;
+}
+
+.presence.online::before {
+  background: #7dff9b;
+  box-shadow: 0 0 6px #7dff9b;
+}
+
+/* ---------- Login ---------- */
+.login {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(30, 70, 70, 0.35);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  z-index: 10;
+  transition: opacity 0.4s;
+  touch-action: auto;
+}
+
+.login.hide {
+  opacity: 0;
+}
+
+.login-card {
+  width: min(100%, 300px);
+  padding: 24px 20px;
+  border-radius: 16px;
+  background: #fffaf0;
+  color: #2b3b3b;
+  text-align: center;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+.login-duck {
+  font-size: 40px;
+}
+
+.login-card h1 {
+  margin: 4px 0;
+  font-size: 18px;
+}
+
+.login-card p {
+  margin: 0 0 16px;
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+.login-card input,
+.login-card button {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 16px; /* 16px evita que Safari iOS haga zoom al enfocar */
+}
+
+.login-card input {
+  border: 2px solid #d9cfb8;
+  background: #fff;
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+.login-card button {
+  border: 0;
+  background: #ffd84d;
+  color: #3a2a00;
+  font-weight: 700;
+}
+
+.login-card .login-error {
+  margin: 12px 0 0;
+  color: #c0392b;
+  opacity: 1;
+}
+
+.shake {
+  animation: shake 0.35s;
+}
+
+@keyframes shake {
+  25% { transform: translateX(-6px); }
+  75% { transform: translateX(6px); }
+}
+
+[hidden] {
+  display: none !important;
+}

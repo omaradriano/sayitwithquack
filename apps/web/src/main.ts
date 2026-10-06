@@ -1,7 +1,6 @@
-import { Color, Fog, Scene, Vector3, MathUtils } from "three";
+import { Color, Fog, Scene } from "three";
 import { createRenderer } from "./core/renderer";
 import { createCamera, frameCamera } from "./core/camera";
-import { screenToWater } from "./core/screen";
 import { Loop } from "./core/loop";
 import { addLights } from "./world/lights";
 import { Pond } from "./world/pond";
@@ -9,9 +8,15 @@ import { Duck } from "./world/duck";
 import { Decor } from "./world/decor";
 import { Swimmer, Couple } from "./behaviors/swim";
 import { addLabel, createLabelRenderer } from "./ui/labels";
-import { COLORS, DUCKS } from "./config";
+import { askForDuck } from "./ui/login";
+import { Joystick } from "./ui/joystick";
+import { PresenceBadge } from "./ui/presence";
+import { Connection } from "./net/connection";
+import { clearSession, loadSession } from "./session";
+import { COLORS, DUCKS, WS_URL, type DuckId } from "./config";
 
 const container = document.getElementById("app")!;
+const SEND_INTERVAL = 0.1; // segundos entre envíos de posición (10 por segundo)
 
 function start() {
   const scene = new Scene();
@@ -27,9 +32,14 @@ function start() {
   const decor = new Decor();
   scene.add(pond, decor);
 
-  // Punto aleatorio del agua que siempre se ve en pantalla (con margen para la etiqueta).
-  const pickPoint = (out: Vector3) =>
-    screenToWater(camera, MathUtils.randFloat(-0.7, 0.7), MathUtils.randFloat(-0.7, 0.5), out);
+  const swimmers = new Map<DuckId, Swimmer>();
+  for (const opts of DUCKS) {
+    const duck = new Duck(opts);
+    duck.label = addLabel(duck, opts.name);
+    scene.add(duck);
+    swimmers.set(opts.id, new Swimmer(duck));
+  }
+  const [a, b] = [...swimmers.values()];
 
   function resize() {
     const { clientWidth: w, clientHeight: h } = container;
@@ -44,30 +54,92 @@ function start() {
   window.addEventListener("resize", resize);
   resize();
 
-  // Los patos se crean con la cámara ya encuadrada, para que nazcan dentro de la pantalla.
-  const [a, b] = DUCKS.map((opts) => {
-    const duck = new Duck(opts);
-    addLabel(duck, opts.name);
-    scene.add(duck);
-    return new Swimmer(duck, pickPoint);
-  });
-
-
   const loop = new Loop(renderer, () => {
     renderer.render(scene, camera);
     labels.render(scene, camera);
   });
   loop.add(pond);
   loop.add(decor);
-  loop.add(a);
-  loop.add(b);
+  for (const s of swimmers.values()) loop.add(s);
   loop.add(new Couple(a, b));
-  loop.add(a.duck);
-  loop.add(b.duck);
+  for (const s of swimmers.values()) loop.add(s.duck);
   loop.start();
 
   // Solo en desarrollo: inspecciona la escena desde la consola (window.scene).
-  if (import.meta.env.DEV) Object.assign(window, { scene, camera, swimmers: [a, b] });
+  if (import.meta.env.DEV) Object.assign(window, { scene, camera, swimmers });
+
+  // Mientras no sepamos quién eres, los dos patos nadan solos detrás del login.
+  const saved = loadSession();
+  (saved ? Promise.resolve(saved) : askForDuck(container)).then((me) => {
+    enterAs(me, swimmers, loop);
+  });
+}
+
+/** Ya sabemos qué pato eres: joystick + conexión en vivo. */
+function enterAs(me: DuckId, swimmers: Map<DuckId, Swimmer>, loop: Loop) {
+  const mine = swimmers.get(me)!;
+  const partnerId = DUCKS.find((d) => d.id !== me)!.id;
+  const partner = swimmers.get(partnerId)!;
+  const partnerName = DUCKS.find((d) => d.id === partnerId)!.name;
+  const presence = new PresenceBadge(container);
+
+  // Joystick: mueve solo a tu pato.
+  const joystick = new Joystick(container, {
+    onStart: () => mine.startManual(),
+    onEnd: () => mine.endManual(),
+  });
+
+  const conn = new Connection(WS_URL, me, {
+    onStatus(status) {
+      if (status === "connecting") presence.show("Conectando…", false);
+      if (status === "offline") {
+        // Sin conexión, el pato de tu pareja vuelve a nadar solo en tu pantalla.
+        if (partner.mode === "remote") partner.releaseRemote();
+        presence.show(conn.replaced ? "Abriste el estanque en otro lado" : "Sin conexión, reintentando…", false);
+      }
+    },
+    onMessage(msg) {
+      switch (msg.t) {
+        case "welcome":
+        case "presence": {
+          const here = msg.online.includes(partnerId);
+          presence.show(here ? `${partnerName} está en el estanque 💛` : `${partnerName} no está en el estanque`, here);
+          if (!here && partner.mode === "remote") partner.releaseRemote();
+          if (msg.t === "welcome") {
+            const own = msg.states[me];
+            if (own) mine.restore(own);
+            const theirs = msg.states[partnerId];
+            if (here && theirs) partner.applyRemote(theirs);
+          }
+          break;
+        }
+        case "state":
+          if (msg.duck === partnerId) partner.applyRemote(msg);
+          break;
+      }
+    },
+  });
+  conn.connect();
+
+  // Cada frame: pasa el joystick al pato y cada 100 ms manda su posición.
+  let sinceSend = 0;
+  loop.add({
+    tick(delta) {
+      mine.input.x = joystick.vector.x;
+      mine.input.y = joystick.vector.y;
+      sinceSend += delta;
+      if (sinceSend >= SEND_INTERVAL) {
+        sinceSend = 0;
+        conn.send({ t: "state", ...mine.snapshot() });
+      }
+    },
+  });
+}
+
+// Abre la app con #salir para olvidar el pato guardado.
+if (location.hash === "#salir") {
+  clearSession();
+  history.replaceState(null, "", location.pathname);
 }
 
 try {

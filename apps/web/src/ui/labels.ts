@@ -13,8 +13,12 @@ export function addLabel(target: Object3D, text: string, height = 1.1) {
   const el = document.createElement("div");
   el.className = "duck-label";
   el.textContent = text;
+  const badge = document.createElement("span");
+  badge.className = "manual-badge";
+  badge.textContent = "🕹️ en control";
+  el.appendChild(badge);
   const label = new CSS2DObject(el);
   label.position.set(0, height, 0);
   target.add(label);
-  return label;
+  return el;
 }
