@@ -25,7 +25,9 @@ export interface DuckConfig {
 export type ClientMessage =
   | { t: "hello"; duck: DuckId }
   | ({ t: "state" } & DuckState)
-  | ({ t: "config" } & DuckConfig);
+  | ({ t: "config" } & DuckConfig)
+  | { t: "push-subscribe"; subscription: PushSubscriptionJSON }
+  | { t: "quack" };
 
 // Servidor → cliente
 export type ServerMessage =
@@ -36,7 +38,17 @@ export type ServerMessage =
       lastSeen: Partial<Record<DuckId, number>>;
       states: Partial<Record<DuckId, DuckState>>;
       configs: Partial<Record<DuckId, DuckConfig>>;
+      /** llave pública VAPID para suscribirse a notificaciones */
+      vapidKey: string;
     }
   | { t: "presence"; online: DuckId[]; lastSeen: Partial<Record<DuckId, number>> }
   | ({ t: "state"; duck: DuckId } & DuckState)
-  | ({ t: "config"; duck: DuckId } & DuckConfig);
+  | ({ t: "config"; duck: DuckId } & DuckConfig)
+  | QuackResult;
+
+/** Respuesta al botón de quack: a cuántos dispositivos se envió. */
+export interface QuackResult {
+  t: "quack-result";
+  sent: number;
+  reason?: "cooldown" | "no-subscription";
+}

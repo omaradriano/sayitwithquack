@@ -14,14 +14,21 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/SherClockHolmes/webpush-go"
 	"github.com/coder/websocket"
 	"github.com/coder/websocket/wsjson"
 
 	"github.com/omaradriano/sayitwithquack/server/internal/protocol"
+	"github.com/omaradriano/sayitwithquack/server/internal/push"
 	"github.com/omaradriano/sayitwithquack/server/internal/store"
 )
 
-const maxMessage = 60 // caracteres del mensaje personalizado
+const (
+	maxMessage    = 60               // caracteres del mensaje personalizado
+	quackCooldown = 10 * time.Second // mínimo entre quacks del mismo pato
+	// Subject VAPID: Apple exige un https:// o mailto: para contactar al dueño del servidor.
+	pushSubject = "https://sayitwithquack.vercel.app"
+)
 
 var hexColor = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
 
@@ -41,9 +48,10 @@ type Hub struct {
 
 	mu      sync.Mutex
 	clients map[string]*client // un cliente por pato
-	// data: configuración, última conexión y última posición de cada pato.
-	// Se guarda en disco al cambiar la configuración o cuando alguien se va.
-	data *store.Data
+	// data: configuración, última conexión, última posición, suscripciones push y llaves VAPID.
+	// Se guarda en disco al cambiar la configuración, al suscribirse o cuando alguien se va.
+	data      *store.Data
+	lastQuack map[string]time.Time
 }
 
 func New(ducks, origins []string, st *store.Store) (*Hub, error) {
@@ -51,12 +59,26 @@ func New(ducks, origins []string, st *store.Store) (*Hub, error) {
 	if err != nil {
 		return nil, err
 	}
+	// La primera vez generamos las llaves VAPID y las guardamos: así las suscripciones
+	// siguen siendo válidas entre despliegues.
+	if data.Vapid == nil {
+		keys, err := push.GenerateKeys()
+		if err != nil {
+			return nil, err
+		}
+		data.Vapid = &keys
+		if err := st.Save(data); err != nil {
+			return nil, err
+		}
+		log.Printf("llaves VAPID generadas")
+	}
 	return &Hub{
-		ducks:   ducks,
-		origins: origins,
-		store:   st,
-		clients: map[string]*client{},
-		data:    data,
+		ducks:     ducks,
+		origins:   origins,
+		store:     st,
+		clients:   map[string]*client{},
+		data:      data,
+		lastQuack: map[string]time.Time{},
 	}, nil
 }
 
@@ -68,7 +90,7 @@ func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer conn.CloseNow()
-	conn.SetReadLimit(1024)
+	conn.SetReadLimit(4096) // las suscripciones push traen una URL larga
 	ctx := r.Context()
 
 	// 1) El primer mensaje debe ser "hello" con un pato válido.
@@ -127,6 +149,15 @@ func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 			h.updateConfig(c, cfg)
+		case "push-subscribe":
+			var msg protocol.PushSubscribe
+			var sub webpush.Subscription
+			if json.Unmarshal(data, &msg) != nil || json.Unmarshal(msg.Subscription, &sub) != nil {
+				continue
+			}
+			h.subscribe(c, sub)
+		case "quack":
+			h.quack(c)
 		}
 	}
 }
@@ -149,6 +180,7 @@ func (h *Hub) join(c *client) {
 		LastSeen: h.data.LastSeen,
 		States:   h.data.States,
 		Configs:  h.data.Configs,
+		VapidKey: h.data.Vapid.Public,
 	})
 	h.broadcastLocked(h.presenceLocked(), c)
 }
@@ -194,10 +226,106 @@ func (h *Hub) updateConfig(c *client, cfg protocol.Config) {
 	if h.clients[c.duck] != c {
 		return
 	}
+	previous := h.data.Configs[c.duck].Message
 	h.data.Configs[c.duck] = cfg
 	h.saveLocked()
 	log.Printf("%s guardó su configuración", c.duck)
 	h.broadcastLocked(cfg, c)
+
+	// Mensaje nuevo → notificación a la pareja.
+	if cfg.Message != "" && cfg.Message != previous {
+		h.notifyOthersLocked(c.duck, push.Payload{
+			Title: displayName(c.duck) + " te dejó un mensaje 💬",
+			Body:  cfg.Message,
+			Tag:   "message-" + c.duck,
+		}, push.Options{TTL: 24 * 60 * 60})
+	}
+}
+
+// subscribe guarda la suscripción push de este dispositivo.
+func (h *Hub) subscribe(c *client, sub webpush.Subscription) {
+	if !strings.HasPrefix(sub.Endpoint, "https://") || sub.Keys.Auth == "" || sub.Keys.P256dh == "" {
+		return
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	// Un dispositivo pertenece a un solo pato: si estaba registrado con otro (#salir), se mueve.
+	h.removeEndpointLocked(sub.Endpoint)
+	h.data.Subscriptions[c.duck] = append(h.data.Subscriptions[c.duck], sub)
+	h.saveLocked()
+	log.Printf("%s activó notificaciones (%d dispositivos)", c.duck, len(h.data.Subscriptions[c.duck]))
+}
+
+// quack manda una notificación "¡Quack!" a la pareja.
+func (h *Hub) quack(c *client) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.clients[c.duck] != c {
+		return
+	}
+	if time.Since(h.lastQuack[c.duck]) < quackCooldown {
+		h.queue(c, protocol.QuackResult{T: "quack-result", Reason: "cooldown"})
+		return
+	}
+	h.lastQuack[c.duck] = time.Now()
+	sent := h.notifyOthersLocked(c.duck, push.Payload{
+		Title: "¡Quack! 💛",
+		Body:  displayName(c.duck) + " te mandó un quack 🦆",
+		Tag:   "quack-" + c.duck,
+	}, push.Options{TTL: 60 * 60, Urgent: true})
+	result := protocol.QuackResult{T: "quack-result", Sent: sent}
+	if sent == 0 {
+		result.Reason = "no-subscription"
+	}
+	h.queue(c, result)
+}
+
+// notifyOthersLocked envía un push a todos los dispositivos de los demás patos
+// y devuelve a cuántos. El envío ocurre en segundo plano. Requiere h.mu.
+func (h *Hub) notifyOthersLocked(from string, p push.Payload, o push.Options) int {
+	o.Subject = pushSubject
+	keys := *h.data.Vapid
+	var subs []webpush.Subscription
+	for duck, list := range h.data.Subscriptions {
+		if duck != from {
+			subs = append(subs, list...)
+		}
+	}
+	for _, sub := range subs {
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+			defer cancel()
+			gone, err := push.Send(ctx, keys, sub, p, o)
+			if err != nil {
+				log.Printf("push: %v", err)
+			}
+			if gone {
+				h.mu.Lock()
+				h.removeEndpointLocked(sub.Endpoint)
+				h.saveLocked()
+				h.mu.Unlock()
+				log.Printf("push: suscripción vencida eliminada")
+			}
+		}()
+	}
+	return len(subs)
+}
+
+func (h *Hub) removeEndpointLocked(endpoint string) {
+	for duck, list := range h.data.Subscriptions {
+		h.data.Subscriptions[duck] = slices.DeleteFunc(list, func(s webpush.Subscription) bool {
+			return s.Endpoint == endpoint
+		})
+	}
+}
+
+// displayName: "omar" → "Omar".
+func displayName(id string) string {
+	if id == "" {
+		return id
+	}
+	r, size := utf8.DecodeRuneInString(id)
+	return strings.ToUpper(string(r)) + id[size:]
 }
 
 // saveLocked escribe el estado a disco. Requiere h.mu.

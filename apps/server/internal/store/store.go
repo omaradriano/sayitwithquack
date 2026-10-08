@@ -9,7 +9,10 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/SherClockHolmes/webpush-go"
+
 	"github.com/omaradriano/sayitwithquack/server/internal/protocol"
+	"github.com/omaradriano/sayitwithquack/server/internal/push"
 )
 
 // Data es todo lo que se persiste.
@@ -17,6 +20,10 @@ type Data struct {
 	Configs  map[string]protocol.Config `json:"configs"`
 	LastSeen map[string]int64           `json:"lastSeen"`
 	States   map[string]protocol.State  `json:"states"`
+	// Suscripciones push de cada pato (puede haber más de un dispositivo).
+	Subscriptions map[string][]webpush.Subscription `json:"subscriptions"`
+	// Llaves VAPID: se generan la primera vez que arranca el servidor.
+	Vapid *push.Keys `json:"vapid,omitempty"`
 }
 
 type Store struct {
@@ -52,6 +59,9 @@ func (s *Store) Load() (*Data, error) {
 	if d.States == nil {
 		d.States = map[string]protocol.State{}
 	}
+	if d.Subscriptions == nil {
+		d.Subscriptions = map[string][]webpush.Subscription{}
+	}
 	return d, nil
 }
 
@@ -63,7 +73,8 @@ func (s *Store) Save(d *Data) error {
 		return err
 	}
 	tmp := s.path + ".tmp"
-	if err := os.WriteFile(tmp, raw, 0o644); err != nil {
+	// 0600: contiene la llave privada VAPID.
+	if err := os.WriteFile(tmp, raw, 0o600); err != nil {
 		return err
 	}
 	return os.Rename(tmp, s.path)

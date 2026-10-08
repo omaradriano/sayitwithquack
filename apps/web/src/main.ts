@@ -15,6 +15,7 @@ import { SettingsMenu } from "./ui/settings";
 import { Connection } from "./net/connection";
 import type { DuckConfig } from "./net/protocol";
 import { clearSession, loadSession } from "./session";
+import { enablePush, existingSubscription, pushStatus, registerServiceWorker } from "./push";
 import { COLORS, DUCKS, WS_URL, type DuckId } from "./config";
 
 const container = document.getElementById("app")!;
@@ -109,14 +110,26 @@ function enterAs(
     duckLabels.get(id)!.setMessage(cfg.message);
   }
 
+  // Notificaciones: el service worker se registra al entrar; el permiso se pide desde el menú.
+  registerServiceWorker();
+  let vapidKey = "";
+
   // Menú ☰: configura solo tu pato.
-  new SettingsMenu({
+  const menu = new SettingsMenu({
+    partnerName,
     current: () => configs.get(me)!,
     preview: (colors) => mine.duck.setColors(colors),
     save(values) {
       if (!conn.send({ t: "config", ...values })) return false;
       applyConfig(me, values);
       return true;
+    },
+    quack: () => conn.send({ t: "quack" }),
+    pushStatus,
+    async enablePush() {
+      if (!vapidKey) throw new Error("sin conexión");
+      const subscription = await enablePush(vapidKey);
+      conn.send({ t: "push-subscribe", subscription });
     },
   });
 
@@ -147,6 +160,13 @@ function enterAs(
           presence.show(here ? `${partnerName} está en el estanque 💛` : `${partnerName} no está en el estanque`, here);
           if (!here && partner.mode === "remote") partner.releaseRemote();
           if (msg.t === "welcome") {
+            vapidKey = msg.vapidKey ?? "";
+            // Si este teléfono ya tenía notificaciones activas, lo volvemos a registrar.
+            if (vapidKey) {
+              existingSubscription(vapidKey).then((subscription) => {
+                if (subscription) conn.send({ t: "push-subscribe", subscription });
+              });
+            }
             for (const [id, cfg] of Object.entries(msg.configs ?? {})) {
               if (cfg && configs.has(id as DuckId)) applyConfig(id as DuckId, cfg);
             }
@@ -162,6 +182,9 @@ function enterAs(
           break;
         case "config":
           if (configs.has(msg.duck)) applyConfig(msg.duck, msg);
+          break;
+        case "quack-result":
+          menu.showQuackResult(msg);
           break;
       }
     },

@@ -29,7 +29,7 @@ func list(s string) []string {
 }
 
 func main() {
-	port := env("PORT", "8787") // Railway lo inyecta
+	port := env("PORT", "8791") // Railway lo inyecta
 	ducks := list(env("DUCK_IDS", "omar,mayra"))
 	// Hosts desde donde se permite abrir el websocket (patrones, sin http://).
 	// Siempre se permite desarrollo local y la red de casa; en Railway agrega el dominio de Vercel.

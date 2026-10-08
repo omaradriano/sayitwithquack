@@ -2,6 +2,8 @@
 // Espejo de apps/web/src/net/protocol.ts: si cambias uno, cambia el otro.
 package protocol
 
+import "encoding/json"
+
 // Envelope sirve para leer solo el tipo antes de decodificar el resto.
 type Envelope struct {
 	T string `json:"t"`
@@ -43,6 +45,22 @@ type Welcome struct {
 	LastSeen map[string]int64  `json:"lastSeen"` // ms Unix de la última desconexión
 	States   map[string]State  `json:"states"`
 	Configs  map[string]Config `json:"configs"`
+	// Llave pública VAPID para que el navegador pueda suscribirse a notificaciones.
+	VapidKey string `json:"vapidKey"`
+}
+
+// PushSubscribe registra este dispositivo para recibir notificaciones.
+// Subscription es el PushSubscription.toJSON() del navegador.
+type PushSubscribe struct {
+	T            string          `json:"t"` // "push-subscribe"
+	Subscription json.RawMessage `json:"subscription"`
+}
+
+// QuackResult le dice a quien mandó el quack si llegó a algún dispositivo.
+type QuackResult struct {
+	T      string `json:"t"`                // "quack-result"
+	Sent   int    `json:"sent"`             // dispositivos a los que se envió
+	Reason string `json:"reason,omitempty"` // "cooldown" | "no-subscription"
 }
 
 // Presence avisa cuando alguien entra o sale.

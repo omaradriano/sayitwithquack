@@ -11,8 +11,8 @@ Estanque low poly con dos patos, hecho con Three.js.
 
 ```sh
 pnpm install
-pnpm dev          # web en http://localhost:5173 (y en tu IP local para el iPhone)
-pnpm dev:server   # Go en http://localhost:8787 (/healthz y /ws)
+pnpm dev          # web en http://localhost:5391 (y en tu IP local para el iPhone)
+pnpm dev:server   # Go en http://localhost:8791 (/healthz y /ws)
 ```
 
 ## Despliegue

@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Agua low poly -->
+  <rect width="512" height="512" fill="#3d8f99"/>
+  <polygon points="0,0 210,0 0,170" fill="#4a9ba4"/>
+  <polygon points="512,0 300,0 512,210" fill="#358590"/>
+  <polygon points="0,512 0,330 230,512" fill="#337f89"/>
+  <polygon points="512,512 512,360 300,512" fill="#4596a0"/>
+  <!-- Onda -->
+  <ellipse cx="250" cy="352" rx="175" ry="26" fill="none" stroke="#e8fbff" stroke-opacity="0.45" stroke-width="8"/>
+  <!-- Pato -->
+  <polygon points="118,298 92,238 162,262" fill="#e3dac5"/>
+  <polygon points="118,298 168,250 330,254 386,290 360,350 172,356" fill="#f6f1e4"/>
+  <polygon points="118,298 360,350 172,356" fill="#e3dac5"/>
+  <polygon points="190,282 300,276 286,322 206,320" fill="#e3dac5"/>
+  <polygon points="298,252 360,246 352,280 306,280" fill="#f6f1e4"/>
+  <polygon points="288,172 364,166 374,246 298,252" fill="#f6f1e4"/>
+  <polygon points="364,166 386,182 392,248 374,246" fill="#e3dac5"/>
+  <polygon points="374,204 428,212 424,234 376,234" fill="#f39c34"/>
+  <rect x="338" y="192" width="13" height="18" fill="#1b1b1b"/>
+  <!-- Corazón -->
+  <path d="M396 150 l-26 -26 a15 15 0 0 1 26 -15 a15 15 0 0 1 26 15 z" fill="#ff8fab"/>
+</svg>

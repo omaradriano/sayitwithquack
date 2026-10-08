@@ -429,3 +429,25 @@ body.settings-open .settings-backdrop {
   background: #9ee2b0;
   color: #0f4020;
 }
+
+.settings-secondary {
+  width: 100%;
+  padding: 12px;
+  border: 2px solid #d9cfb8;
+  border-radius: 12px;
+  background: #fff;
+  color: #2b3b3b;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.settings-secondary:disabled {
+  opacity: 0.6;
+}
+
+.settings-note {
+  margin: 8px 0;
+  font-size: 12px;
+  line-height: 1.45;
+}
