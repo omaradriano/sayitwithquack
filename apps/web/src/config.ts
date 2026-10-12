@@ -25,3 +25,11 @@ export const COLORS = {
   sky: "#a9d8cf", // fondo y niebla
   water: "#3d8f99",
 };
+
+/** Reglas del hambre. Espejo de apps/server/internal/pet: si cambias una, cambia las dos. */
+export const HUNGER = {
+  fullToEmptyHours: 48, // de 100 % a 0 % en 2 días
+  feedAmount: 30,
+  fullAt: 90, // arriba de esto "¡Está lleno!"
+  hungryAt: 25, // abajo de esto: cabizbajo y "tengo hambre"
+};

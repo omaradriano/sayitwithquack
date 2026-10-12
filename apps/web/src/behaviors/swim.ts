@@ -2,7 +2,7 @@ import { MathUtils, Vector3 } from "three";
 import type { Updatable } from "../core/loop";
 import type { Duck } from "../world/duck";
 import { waveHeight } from "../world/pond";
-import { POND } from "../config";
+import { HUNGER, POND } from "../config";
 import type { DuckState } from "../net/protocol";
 
 /** Interpola entre dos ángulos por el camino más corto. */
@@ -46,6 +46,8 @@ export class Swimmer implements Updatable {
   together = 0;
   /** Dirección del joystick (x derecha, y abajo) en modo manual. */
   readonly input = { x: 0, y: 0 };
+  /** Segundos que le quedan comiendo (se queda quieto). */
+  eating = 0;
 
   private target = new Vector3();
   private rest = 0;
@@ -116,7 +118,16 @@ export class Swimmer implements Updatable {
   tick(delta: number, t: number) {
     if (this.mode === "remote") this.tickRemote(delta);
     else {
-      const desiredSpeed = this.mode === "manual" ? this.tickManual(delta) : this.tickAuto(delta);
+      this.eating = Math.max(0, this.eating - delta);
+      // Dormido o comiendo: no nada. Con hambre: a media velocidad.
+      const still = this.duck.asleep || this.eating > 0;
+      const energy = this.duck.hunger < HUNGER.hungryAt ? 0.5 : 1;
+      let desiredSpeed = 0;
+      if (!still) {
+        desiredSpeed = (this.mode === "manual" ? this.tickManual(delta) : this.tickAuto(delta)) * energy;
+      } else if (this.mode === "manual" && !this.holding) {
+        this.tickManual(delta); // deja que termine la espera tras soltar el joystick
+      }
       this.speed = MathUtils.lerp(this.speed, desiredSpeed, damp(this.mode === "manual" ? 5 : 2, delta));
       // rotation.y = heading hace que +Z apunte a (sin h, cos h).
       this.duck.position.x += Math.sin(this.heading) * this.speed * delta;
@@ -249,6 +260,7 @@ export class Couple implements Updatable {
     }
 
     if (this.a.together > 0 || this.b.together > 0) return;
+    if (this.a.duck.asleep || this.b.duck.asleep) return;
     this.nextTogether -= delta;
     if (this.nextTogether <= 0) {
       this.nextTogether = MathUtils.randFloat(18, 30);

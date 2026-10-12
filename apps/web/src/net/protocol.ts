@@ -27,7 +27,8 @@ export type ClientMessage =
   | ({ t: "state" } & DuckState)
   | ({ t: "config" } & DuckConfig)
   | { t: "push-subscribe"; subscription: PushSubscriptionJSON }
-  | { t: "quack" };
+  | { t: "quack" }
+  | { t: "feed" };
 
 // Servidor → cliente
 export type ServerMessage =
@@ -40,11 +41,23 @@ export type ServerMessage =
       configs: Partial<Record<DuckId, DuckConfig>>;
       /** llave pública VAPID para suscribirse a notificaciones */
       vapidKey: string;
+      pets: Partial<Record<DuckId, PetState>>;
+      /** hora del servidor (ms Unix) */
+      now: number;
     }
   | { t: "presence"; online: DuckId[]; lastSeen: Partial<Record<DuckId, number>> }
   | ({ t: "state"; duck: DuckId } & DuckState)
   | ({ t: "config"; duck: DuckId } & DuckConfig)
-  | QuackResult;
+  | QuackResult
+  | ({ t: "pet"; duck: DuckId; fed: boolean; seed: number; now: number } & PetState)
+  | { t: "feed-result"; reason: "full" | "coins" };
+
+/** Hambre: "nivel en el momento at". El hambre actual se calcula con el tiempo transcurrido. */
+export interface PetState {
+  level: number; // 0–100
+  at: number; // ms Unix (hora del servidor)
+  coins: number;
+}
 
 /** Respuesta al botón de quack: a cuántos dispositivos se envió. */
 export interface QuackResult {

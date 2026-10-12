@@ -26,6 +26,9 @@ Mapa del código web en `README.md`. Piezas clave:
 - `ui/settings.ts`: menú ☰ (colores, mensaje, botón de quack, activar notificaciones) (va en `<body>`, fuera de `#app`, para no activar el joystick). Cada quien configura solo su pato: colores (cuerpo, alas, cabeza) con vista previa local y mensaje de máx. 60 caracteres. Se envía al pulsar "Guardar configuración"; si cierras sin guardar, se revierte.
 - `push.ts` + `public/sw.js`: notificaciones Web Push. El service worker solo muestra notificaciones (no cachea nada, para no ocupar espacio: el teléfono de Mayra no tiene espacio libre). En iPhone solo funcionan con la app agregada a la pantalla de inicio (iOS 16.4+); el permiso se pide desde un toque en el menú.
 - `public/manifest.webmanifest` + `public/icons/`: app instalable (pantalla completa, ícono low poly; fuente en `icons/icon.svg`).
+- `pets.ts` + `apps/server/internal/pet`: hambre. Se guarda como "nivel X en el momento T" y se calcula con el tiempo (100 % → 0 % en 48 h), con la hora del servidor (`now` en `welcome`/`pet`). Reglas en `HUNGER` (config.ts) y `internal/pet` (espejo). Alimentar: +30 %, rechazado arriba de 90 %. Con <25 % nada a media velocidad y cabizbajo; en 0 % se duerme (no se mueve ni con joystick) hasta que lo alimenten. Monedas y `FoodCost` listos (costo 0) para los minijuegos.
+- `world/effects.ts`: animación de alimentar (migajas con semilla compartida para que caigan igual en ambos teléfonos, splash, picotazos, 💛) y 💤 sobre patos dormidos.
+- `ui/feed-button.ts`: botón "🍞 Alimentar · NN%" abajo (en `<body>`, fuera de `#app`). Solo alimenta a tu pato.
 - `world/duck.ts`: cada pato tiene sus propios materiales de cuerpo, alas y cabeza (`setColors`); pico y ojos son compartidos.
 
 ## Cómo funciona el tiempo real
@@ -33,6 +36,7 @@ Mapa del código web en `README.md`. Piezas clave:
 - **Cada cliente es dueño de su pato:** lo simula y manda `{t:"state", x, z, h, s, m}` cada 100 ms. El pato de la pareja se dibuja con lo que llega, extrapolando entre mensajes; si no llegan datos por más de 0.4 s, frena.
 - **Servidor Go = relay:** el primer mensaje es `hello` con el id del pato. El servidor reenvía estados y configuraciones (`config`), avisa quién está (`welcome` / `presence` con `online` y `lastSeen`) y guarda el último estado de cada pato para que al recargar continúe donde estaba. Valida colores `#rrggbb` y recorta el mensaje a 60 caracteres. Si se conecta el mismo pato dos veces, la conexión nueva reemplaza a la vieja (cierre con razón `replaced`).
 - **Seguridad:** el servidor solo acepta websockets de orígenes permitidos (localhost, 127.0.0.1, 192.168.* y `ALLOWED_ORIGINS`). Los códigos secretos están en `config.ts` por decisión de Omar: viajan en el JS publicado, sirven para identificar el pato, no como contraseña real.
+- **Alimentar:** cliente manda `feed`; el servidor valida y emite `pet` (con `fed: true` y `seed`) a todos, incluido quien alimentó, para que la animación salga en ambos; si no se puede, responde `feed-result`. `WatchHunger` revisa cada 5 min y avisa por push al dueño cuando su pato baja de 25 % (una vez por bajada).
 - **Notificaciones:** el servidor genera las llaves VAPID la primera vez y las guarda en `state.json`; manda la pública en `welcome.vapidKey`. Cada dispositivo manda `push-subscribe` (se re-registra en cada conexión). Avisos: botón "Mandar un quack 💛" (`quack`, 1 cada 10 s, responde `quack-result`) y mensaje nuevo al guardar uno distinto. Suscripciones vencidas (404/410) se borran solas.
 - **Persistencia:** `internal/store` guarda `state.json` (configs, lastSeen y últimas posiciones) en `DATA_DIR` con escritura atómica. Se escribe al guardar una configuración y cuando alguien se desconecta. En local es `apps/server/data/` (ignorado en git); en Railway, un volumen montado en `/data`.
 - **Cerrar sesión:** abrir la app con `#salir` borra la sesión de localStorage.
@@ -71,8 +75,10 @@ pnpm build
 6. Menú ☰ de configuración: colores del pato y mensaje personalizado, persistidos en un archivo JSON.
 7. Puertos locales propios (5391 / 8791).
 8. App instalable (manifest + ícono) y notificaciones push: quack y mensaje nuevo.
+9. Mascotas: barra de hambre, botón de alimentar con animación, sueño en 0 % y aviso de hambre.
 
 ## Ideas pendientes
 
 - Despliegue automático del servidor: conectar el repo en Railway con Root Directory `/apps/server`.
-- Más acciones en vivo (quack, corazones, etc.).
+- Minijuegos para ganar monedas y usarlas para comprar comida.
+- Más acciones en vivo.

@@ -11,6 +11,7 @@ import (
 
 	"github.com/SherClockHolmes/webpush-go"
 
+	"github.com/omaradriano/sayitwithquack/server/internal/pet"
 	"github.com/omaradriano/sayitwithquack/server/internal/protocol"
 	"github.com/omaradriano/sayitwithquack/server/internal/push"
 )
@@ -22,6 +23,10 @@ type Data struct {
 	States   map[string]protocol.State  `json:"states"`
 	// Suscripciones push de cada pato (puede haber más de un dispositivo).
 	Subscriptions map[string][]webpush.Subscription `json:"subscriptions"`
+	// Hambre y monedas de cada pato.
+	Pets map[string]pet.State `json:"pets"`
+	// Patos a los que ya avisamos que tienen hambre (se reinicia al comer).
+	HungryNotified map[string]bool `json:"hungryNotified"`
 	// Llaves VAPID: se generan la primera vez que arranca el servidor.
 	Vapid *push.Keys `json:"vapid,omitempty"`
 }
@@ -58,6 +63,12 @@ func (s *Store) Load() (*Data, error) {
 	}
 	if d.States == nil {
 		d.States = map[string]protocol.State{}
+	}
+	if d.Pets == nil {
+		d.Pets = map[string]pet.State{}
+	}
+	if d.HungryNotified == nil {
+		d.HungryNotified = map[string]bool{}
 	}
 	if d.Subscriptions == nil {
 		d.Subscriptions = map[string][]webpush.Subscription{}

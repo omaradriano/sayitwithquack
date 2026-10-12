@@ -6,6 +6,9 @@ import { addLights } from "./world/lights";
 import { Pond } from "./world/pond";
 import { Duck } from "./world/duck";
 import { Decor } from "./world/decor";
+import { Effects } from "./world/effects";
+import { Pets } from "./pets";
+import { FeedButton } from "./ui/feed-button";
 import { Swimmer, Couple } from "./behaviors/swim";
 import { DuckLabel, createLabelRenderer } from "./ui/labels";
 import { askForDuck } from "./ui/login";
@@ -46,6 +49,9 @@ function start() {
     swimmers.set(opts.id, new Swimmer(duck));
   }
   const [a, b] = [...swimmers.values()];
+  const pets = new Pets();
+  const effects = new Effects([...swimmers.values()].map((s) => s.duck));
+  scene.add(effects);
 
   function resize() {
     const { clientWidth: w, clientHeight: h } = container;
@@ -69,6 +75,22 @@ function start() {
   for (const s of swimmers.values()) loop.add(s);
   loop.add(new Couple(a, b));
   for (const s of swimmers.values()) loop.add(s.duck);
+  loop.add(effects);
+
+  // Hambre: cada frame al pato (velocidad, cabeza, sueño); cada medio segundo a la barra.
+  let sinceBars = 0;
+  loop.add({
+    tick(delta) {
+      sinceBars += delta;
+      const updateBars = sinceBars >= 0.5;
+      if (updateBars) sinceBars = 0;
+      for (const [id, s] of swimmers) {
+        const hunger = pets.hunger(id);
+        s.duck.hunger = hunger;
+        if (updateBars) duckLabels.get(id)!.setHunger(hunger);
+      }
+    },
+  });
   loop.start();
 
   // Solo en desarrollo: inspecciona la escena desde la consola (window.scene).
@@ -77,17 +99,20 @@ function start() {
   // Mientras no sepamos quién eres, los dos patos nadan solos detrás del login.
   const saved = loadSession();
   (saved ? Promise.resolve(saved) : askForDuck(container)).then((me) => {
-    enterAs(me, swimmers, duckLabels, loop);
+    enterAs(me, { swimmers, duckLabels, loop, pets, effects });
   });
 }
 
 /** Ya sabemos qué pato eres: joystick + conexión en vivo. */
-function enterAs(
-  me: DuckId,
-  swimmers: Map<DuckId, Swimmer>,
-  duckLabels: Map<DuckId, DuckLabel>,
-  loop: Loop,
-) {
+interface World {
+  swimmers: Map<DuckId, Swimmer>;
+  duckLabels: Map<DuckId, DuckLabel>;
+  loop: Loop;
+  pets: Pets;
+  effects: Effects;
+}
+
+function enterAs(me: DuckId, { swimmers, duckLabels, loop, pets, effects }: World) {
   const mine = swimmers.get(me)!;
   const partnerId = DUCKS.find((d) => d.id !== me)!.id;
   const partner = swimmers.get(partnerId)!;
@@ -133,6 +158,12 @@ function enterAs(
     },
   });
 
+  // Botón 🍞: alimenta solo a tu pato.
+  const feedButton = new FeedButton({
+    hunger: () => pets.hunger(me),
+    feed: () => conn.send({ t: "feed" }),
+  });
+
   /** Pone "en línea" / "visto ..." en la etiqueta de cada pato. */
   function updateLabels(online: DuckId[], lastSeen: Partial<Record<DuckId, number>>) {
     for (const [id, label] of duckLabels) {
@@ -161,6 +192,11 @@ function enterAs(
           if (!here && partner.mode === "remote") partner.releaseRemote();
           if (msg.t === "welcome") {
             vapidKey = msg.vapidKey ?? "";
+            if (msg.now) pets.syncClock(msg.now);
+            for (const [id, state] of Object.entries(msg.pets ?? {})) {
+              if (state && swimmers.has(id as DuckId)) pets.set(id as DuckId, state);
+            }
+            feedButton.refresh();
             // Si este teléfono ya tenía notificaciones activas, lo volvemos a registrar.
             if (vapidKey) {
               existingSubscription(vapidKey).then((subscription) => {
@@ -185,6 +221,16 @@ function enterAs(
           break;
         case "quack-result":
           menu.showQuackResult(msg);
+          break;
+        case "pet":
+          if (!swimmers.has(msg.duck)) break;
+          pets.syncClock(msg.now);
+          pets.set(msg.duck, msg);
+          if (msg.fed) effects.feed(swimmers.get(msg.duck)!, msg.seed);
+          feedButton.refresh();
+          break;
+        case "feed-result":
+          feedButton.rejected(msg.reason);
           break;
       }
     },

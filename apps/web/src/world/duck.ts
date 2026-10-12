@@ -48,8 +48,13 @@ function part(g: BufferGeometry, material: MeshStandardMaterial, x: number, y: n
  * Un pato low poly hecho de cajas. Mira hacia +Z.
  * Duck (posición y rumbo, lo controla el nado)
  *  └─ model (balanceo sobre el agua)
- *      └─ cuerpo, cabeza, pico...
+ *      ├─ cuerpo, cola, alas
+ *      └─ headGroup (gira sobre la base del cuello: picotear, agachar la cabeza)
+ *          └─ cuello, cabeza, pico, ojos
  */
+
+const PECK_TIME = 0.4; // segundos que dura un picotazo
+const NECK = { y: 0.22, z: 0.22 }; // pivote de la cabeza (base del cuello)
 export class Duck extends Group implements Updatable {
   readonly model = new Group();
   /** 0 = quieto, 1 = nadando a máxima velocidad. Lo actualiza el nado. */
@@ -58,6 +63,12 @@ export class Duck extends Group implements Updatable {
   manual = false;
   /** Etiqueta HTML con el nombre (la crea ui/labels). */
   label?: HTMLElement;
+  /** Hambre 0–100. Con poca hambre agacha la cabeza; en 0 se duerme. */
+  hunger = 100;
+  readonly headGroup = new Group();
+  private eyes: Mesh[] = [];
+  private peckT = Infinity; // tiempo desde el último picotazo
+  private droop = 0;
   private phase = Math.random() * Math.PI * 2;
   private ripple: Mesh<RingGeometry, MeshBasicMaterial>;
   private colors: Record<keyof DuckColors, MeshStandardMaterial>;
@@ -71,16 +82,23 @@ export class Duck extends Group implements Updatable {
     const tail = part(geo.tail, body, 0, 0.24, -0.4);
     tail.rotation.set(-1.1, Math.PI / 4, 0);
 
+    // Las piezas de la cabeza se posicionan relativas al pivote del cuello.
+    const at = (x: number, y: number, z: number) => [x, y - NECK.y, z - NECK.z] as const;
+    this.eyes = [part(geo.eye, eye, ...at(0.142, 0.5, 0.31)), part(geo.eye, eye, ...at(-0.142, 0.5, 0.31))];
+    this.headGroup.position.set(0, NECK.y, NECK.z);
+    this.headGroup.add(
+      part(geo.neck, head, ...at(0, 0.28, 0.22)),
+      part(geo.head, head, ...at(0, 0.45, 0.24)),
+      part(geo.beak, beak, ...at(0, 0.42, 0.46)),
+      ...this.eyes,
+    );
+
     this.model.add(
       part(geo.body, body, 0, 0.1, 0),
       tail,
       part(geo.wing, wing, 0.27, 0.15, -0.04),
       part(geo.wing, wing, -0.27, 0.15, -0.04),
-      part(geo.neck, head, 0, 0.28, 0.22),
-      part(geo.head, head, 0, 0.45, 0.24),
-      part(geo.beak, beak, 0, 0.42, 0.46),
-      part(geo.eye, eye, 0.142, 0.5, 0.31),
-      part(geo.eye, eye, -0.142, 0.5, 0.31),
+      this.headGroup,
     );
     this.model.scale.setScalar(1.2);
     this.add(this.model);
@@ -111,11 +129,32 @@ export class Duck extends Group implements Updatable {
     };
   }
 
-  tick(_delta: number, t: number) {
+  get asleep() {
+    return this.hunger <= 0;
+  }
+
+  /** Un picotazo (lo usa la animación de alimentar). */
+  peck() {
+    this.peckT = 0;
+  }
+
+  tick(delta: number, t: number) {
     const p = this.phase;
+    // Dormido se mece más lento y menos.
+    const calm = this.asleep ? 0.4 : 1;
     // Balanceo suave, un poco más fuerte cuando nada.
-    this.model.rotation.z = Math.sin(t * 1.7 + p) * (0.04 + this.moving * 0.03);
-    this.model.rotation.x = Math.sin(t * 2.3 + p) * 0.03 - this.moving * 0.05;
+    this.model.rotation.z = Math.sin(t * 1.7 * calm + p) * (0.04 + this.moving * 0.03) * calm;
+    this.model.rotation.x = Math.sin(t * 2.3 * calm + p) * 0.03 * calm - this.moving * 0.05;
+
+    // Cabeza: dormido la agacha mucho, con hambre un poco.
+    const targetDroop = this.asleep ? 0.6 : this.hunger < 25 ? 0.25 : 0;
+    this.droop += (targetDroop - this.droop) * (1 - Math.exp(-3 * delta));
+    this.peckT += delta;
+    const peck = this.peckT < PECK_TIME ? Math.sin((this.peckT / PECK_TIME) * Math.PI) * 1.0 : 0;
+    // rotation.x positiva inclina la cabeza hacia adelante y abajo.
+    this.headGroup.rotation.x = this.droop + peck;
+    // Ojos cerrados al dormir.
+    for (const e of this.eyes) e.scale.y = this.asleep ? 0.15 : 1;
 
     // La onda crece y se desvanece en ciclo.
     const k = (t * 0.7 + p) % 1;

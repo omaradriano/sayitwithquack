@@ -1,5 +1,6 @@
 import type { Object3D } from "three";
 import { CSS2DObject, CSS2DRenderer } from "three/addons/renderers/CSS2DRenderer.js";
+import { HUNGER } from "../config";
 
 const SWAP_EVERY = 5000; // ms entre nombre ↔ estado
 const FADE = 200; // ms del desvanecido (igual que en style.css)
@@ -32,12 +33,13 @@ function statusText(p: Exclude<Presence, null>) {
   return p.lastSeen ? `visto ${formatLastSeen(p.lastSeen)}` : "desconectado";
 }
 
-type Phase = "name" | "status" | "message";
-const PHASES: Phase[] = ["name", "status", "message"];
+type Phase = "name" | "status" | "mood" | "message";
+const PHASES: Phase[] = ["name", "status", "mood", "message"];
 
 /**
  * Etiqueta con el nombre del pato. Cada 5 s pasa a la siguiente fase:
- * nombre → "en línea" / "visto hoy 2:32 p.m." → mensaje personalizado.
+ * nombre → "en línea" / "visto hoy 2:32 p.m." → "tengo hambre 🥺" → mensaje personalizado.
+ * Debajo lleva la barra de hambre.
  * Las fases sin contenido (sin conexión, sin mensaje) se saltan.
  */
 export class DuckLabel {
@@ -45,7 +47,9 @@ export class DuckLabel {
   private text: HTMLSpanElement;
   private presence: Presence = null;
   private message = "";
+  private hunger = 100;
   private phase: Phase = "name";
+  private fill: HTMLDivElement;
 
   constructor(
     target: Object3D,
@@ -60,7 +64,12 @@ export class DuckLabel {
     const badge = document.createElement("span");
     badge.className = "manual-badge";
     badge.textContent = "🕹️ en control";
-    this.el.append(this.text, badge);
+    const bar = document.createElement("div");
+    bar.className = "hunger-bar";
+    this.fill = document.createElement("div");
+    this.fill.className = "hunger-fill";
+    bar.appendChild(this.fill);
+    this.el.append(this.text, badge, bar);
 
     const label = new CSS2DObject(this.el);
     label.position.set(0, height, 0);
@@ -81,8 +90,19 @@ export class DuckLabel {
     this.render();
   }
 
+  /** Barra de hambre: verde lleno → amarillo → rojo vacío. */
+  setHunger(pct: number) {
+    const changedMood = (pct < HUNGER.hungryAt) !== (this.hunger < HUNGER.hungryAt) || (pct <= 0) !== (this.hunger <= 0);
+    this.hunger = pct;
+    this.fill.style.width = `${pct}%`;
+    this.fill.style.background = `hsl(${Math.round(pct * 1.2)} 70% 45%)`;
+    this.el.classList.toggle("is-asleep", pct <= 0);
+    if (changedMood) this.render();
+  }
+
   private available(phase: Phase) {
     if (phase === "status") return this.presence !== null;
+    if (phase === "mood") return this.hunger < HUNGER.hungryAt;
     if (phase === "message") return this.message !== "";
     return true;
   }
@@ -112,6 +132,7 @@ export class DuckLabel {
     if (!this.available(this.phase)) this.phase = "name";
     this.el.classList.toggle("is-message", this.phase === "message");
     if (this.phase === "status" && this.presence) this.text.textContent = statusText(this.presence);
+    else if (this.phase === "mood") this.text.textContent = this.hunger <= 0 ? "durmiendo 💤" : "tengo hambre 🥺";
     else if (this.phase === "message") this.text.textContent = `💬 ${this.message}`;
     else this.text.textContent = this.name;
   }

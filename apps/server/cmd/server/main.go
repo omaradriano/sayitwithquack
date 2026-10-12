@@ -1,10 +1,12 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/omaradriano/sayitwithquack/server/internal/hub"
 	"github.com/omaradriano/sayitwithquack/server/internal/store"
@@ -48,6 +50,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("hub: %v", err)
 	}
+
+	// Revisa el hambre cada 5 minutos para mandar el aviso de "tu patito tiene hambre".
+	go h.WatchHunger(context.Background(), 5*time.Minute)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {

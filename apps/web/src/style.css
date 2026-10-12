@@ -451,3 +451,101 @@ body.settings-open .settings-backdrop {
   font-size: 12px;
   line-height: 1.45;
 }
+
+/* ---------- Hambre ---------- */
+.duck-label {
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.hunger-bar {
+  flex-basis: 100%;
+  height: 4px;
+  margin-top: 3px;
+  border-radius: 2px;
+  background: rgba(58, 42, 0, 0.18);
+  overflow: hidden;
+}
+
+.hunger-fill {
+  height: 100%;
+  width: 100%;
+  border-radius: 2px;
+  transition: width 1.2s ease, background 1.2s;
+}
+
+.duck-label.is-asleep {
+  background: #c9d3e6;
+  color: #26324a;
+}
+
+/* ---------- Botón de alimentar ---------- */
+.feed {
+  position: fixed;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+  transform: translateX(-50%);
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.feed-button {
+  padding: 12px 20px;
+  border: 0;
+  border-radius: 999px;
+  background: #ffd84d;
+  color: #3a2a00;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.feed-button:active {
+  transform: scale(0.96);
+}
+
+.feed-button:disabled {
+  background: #f3e3a8;
+}
+
+.feed-button.is-hungry:not(:disabled) {
+  animation: nudge 1.6s ease-in-out infinite;
+}
+
+@keyframes nudge {
+  0%, 70%, 100% { transform: none; }
+  80% { transform: rotate(-4deg); }
+  90% { transform: rotate(4deg); }
+}
+
+.feed-toast {
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(20, 50, 50, 0.8);
+  color: #fff;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* ---------- Emojis flotantes (corazones, 💤) ---------- */
+.floater {
+  display: block;
+  font-size: 16px;
+  animation: float-up 1.4s ease-out forwards;
+  pointer-events: none;
+}
+
+.floater.zzz {
+  font-size: 14px;
+}
+
+@keyframes float-up {
+  from { transform: translateY(0) scale(0.6); opacity: 0; }
+  20% { opacity: 1; transform: translateY(-8px) scale(1); }
+  to { transform: translateY(-46px) scale(1); opacity: 0; }
+}

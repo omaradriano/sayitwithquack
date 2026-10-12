@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log"
+	"math/rand/v2"
 	"net/http"
 	"regexp"
 	"slices"
@@ -18,6 +19,7 @@ import (
 	"github.com/coder/websocket"
 	"github.com/coder/websocket/wsjson"
 
+	"github.com/omaradriano/sayitwithquack/server/internal/pet"
 	"github.com/omaradriano/sayitwithquack/server/internal/protocol"
 	"github.com/omaradriano/sayitwithquack/server/internal/push"
 	"github.com/omaradriano/sayitwithquack/server/internal/store"
@@ -71,6 +73,12 @@ func New(ducks, origins []string, st *store.Store) (*Hub, error) {
 			return nil, err
 		}
 		log.Printf("llaves VAPID generadas")
+	}
+	// Cada pato empieza lleno.
+	for _, duck := range ducks {
+		if _, ok := data.Pets[duck]; !ok {
+			data.Pets[duck] = pet.New(time.Now())
+		}
 	}
 	return &Hub{
 		ducks:     ducks,
@@ -158,6 +166,8 @@ func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			h.subscribe(c, sub)
 		case "quack":
 			h.quack(c)
+		case "feed":
+			h.feed(c)
 		}
 	}
 }
@@ -181,6 +191,8 @@ func (h *Hub) join(c *client) {
 		States:   h.data.States,
 		Configs:  h.data.Configs,
 		VapidKey: h.data.Vapid.Public,
+		Pets:     h.petsLocked(),
+		Now:      time.Now().UnixMilli(),
 	})
 	h.broadcastLocked(h.presenceLocked(), c)
 }
@@ -242,6 +254,72 @@ func (h *Hub) updateConfig(c *client, cfg protocol.Config) {
 	}
 }
 
+// feed alimenta al pato de quien lo pide (cada quien solo al suyo).
+func (h *Hub) feed(c *client) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.clients[c.duck] != c {
+		return
+	}
+	now := time.Now()
+	fed, reason := h.data.Pets[c.duck].Feed(now)
+	if reason != "" {
+		h.queue(c, protocol.FeedResult{T: "feed-result", Reason: reason})
+		return
+	}
+	h.data.Pets[c.duck] = fed
+	h.data.HungryNotified[c.duck] = false
+	h.saveLocked()
+	log.Printf("%s alimentó a su pato (%.0f%%)", c.duck, fed.Level)
+	// A todos, incluido quien alimentó: así la animación sale igual en ambos teléfonos.
+	msg := protocol.Pet{
+		T: "pet", Duck: c.duck, PetState: protocol.PetState(fed),
+		Fed: true, Seed: rand.IntN(1 << 30), Now: now.UnixMilli(),
+	}
+	h.broadcastLocked(msg, nil)
+}
+
+func (h *Hub) petsLocked() map[string]protocol.PetState {
+	pets := map[string]protocol.PetState{}
+	for duck, s := range h.data.Pets {
+		pets[duck] = protocol.PetState(s)
+	}
+	return pets
+}
+
+// WatchHunger revisa cada pocos minutos si algún pato tiene hambre y le avisa a su dueño.
+func (h *Hub) WatchHunger(ctx context.Context, every time.Duration) {
+	t := time.NewTicker(every)
+	defer t.Stop()
+	for {
+		h.checkHunger()
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+		}
+	}
+}
+
+func (h *Hub) checkHunger() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	now := time.Now()
+	for duck, s := range h.data.Pets {
+		if s.Current(now) >= pet.HungryAt || h.data.HungryNotified[duck] {
+			continue
+		}
+		h.data.HungryNotified[duck] = true
+		h.saveLocked()
+		sent := h.notifyLocked(func(d string) bool { return d == duck }, push.Payload{
+			Title: "Tu patito tiene hambre 🥺",
+			Body:  "Dale de comer antes de que se quede dormido 🍞",
+			Tag:   "hungry-" + duck,
+		}, push.Options{TTL: 12 * 60 * 60})
+		log.Printf("%s tiene hambre (aviso a %d dispositivos)", duck, sent)
+	}
+}
+
 // subscribe guarda la suscripción push de este dispositivo.
 func (h *Hub) subscribe(c *client, sub webpush.Subscription) {
 	if !strings.HasPrefix(sub.Endpoint, "https://") || sub.Keys.Auth == "" || sub.Keys.P256dh == "" {
@@ -283,11 +361,17 @@ func (h *Hub) quack(c *client) {
 // notifyOthersLocked envía un push a todos los dispositivos de los demás patos
 // y devuelve a cuántos. El envío ocurre en segundo plano. Requiere h.mu.
 func (h *Hub) notifyOthersLocked(from string, p push.Payload, o push.Options) int {
+	return h.notifyLocked(func(duck string) bool { return duck != from }, p, o)
+}
+
+// notifyLocked envía un push a los dispositivos de los patos que cumplan to(duck).
+// Devuelve a cuántos; el envío ocurre en segundo plano. Requiere h.mu.
+func (h *Hub) notifyLocked(to func(duck string) bool, p push.Payload, o push.Options) int {
 	o.Subject = pushSubject
 	keys := *h.data.Vapid
 	var subs []webpush.Subscription
 	for duck, list := range h.data.Subscriptions {
-		if duck != from {
+		if to(duck) {
 			subs = append(subs, list...)
 		}
 	}

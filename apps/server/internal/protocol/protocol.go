@@ -47,6 +47,32 @@ type Welcome struct {
 	Configs  map[string]Config `json:"configs"`
 	// Llave pública VAPID para que el navegador pueda suscribirse a notificaciones.
 	VapidKey string `json:"vapidKey"`
+	// Hambre de cada pato y hora del servidor (para que el cliente calcule el hambre actual).
+	Pets map[string]PetState `json:"pets"`
+	Now  int64               `json:"now"`
+}
+
+// PetState: hambre "nivel en el momento at". Igual que pet.State.
+type PetState struct {
+	Level float64 `json:"level"`
+	At    int64   `json:"at"`
+	Coins int     `json:"coins"`
+}
+
+// Pet avisa que cambió el hambre de un pato. Fed = true: acaban de alimentarlo (animación).
+type Pet struct {
+	T    string `json:"t"` // "pet"
+	Duck string `json:"duck"`
+	PetState
+	Fed  bool  `json:"fed"`
+	Seed int   `json:"seed"` // para que las migajas caigan igual en ambos teléfonos
+	Now  int64 `json:"now"`
+}
+
+// FeedResult explica por qué no se pudo alimentar.
+type FeedResult struct {
+	T      string `json:"t"`      // "feed-result"
+	Reason string `json:"reason"` // "full" | "coins"
 }
 
 // PushSubscribe registra este dispositivo para recibir notificaciones.
