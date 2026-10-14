@@ -28,6 +28,7 @@ Mapa del código web en `README.md`. Piezas clave:
 - `public/manifest.webmanifest` + `public/icons/`: app instalable (pantalla completa, ícono low poly; fuente en `icons/icon.svg`).
 - `pets.ts` + `apps/server/internal/pet`: hambre. Se guarda como "nivel X en el momento T" y se calcula con el tiempo (100 % → 0 % en 48 h), con la hora del servidor (`now` en `welcome`/`pet`). Reglas en `HUNGER` (config.ts) y `internal/pet` (espejo). Alimentar: +30 %, rechazado arriba de 90 %. Con <25 % nada a media velocidad y cabizbajo; en 0 % se duerme (no se mueve ni con joystick) hasta que lo alimenten. Monedas y `FoodCost` listos (costo 0) para los minijuegos.
 - `world/effects.ts`: animación de alimentar (migajas con semilla compartida para que caigan igual en ambos teléfonos, splash, picotazos, 💛) y 💤 sobre patos dormidos.
+- `ui/days-counter.ts`: gema low poly arriba a la izquierda con el contador de días **compartido**: sube +1 el día en que los dos alimentaron a su pato (`pet.Together` en `state.json`, se manda como `days` en `welcome` y `pet`). Abajo, un circulito por pato (inicial) que se llena cuando ya comió hoy (`lastDay` de cada pato). El día es el de México (`pet.Day` / `Intl` con `America/Mexico_City`; Go embebe `time/tzdata` porque distroless no trae zonas horarias). No se reinicia si faltan días.
 - `ui/feed-button.ts`: botón "🍞 Alimentar · NN%" abajo (en `<body>`, fuera de `#app`). Solo alimenta a tu pato.
 - `world/duck.ts`: cada pato tiene sus propios materiales de cuerpo, alas y cabeza (`setColors`); pico y ojos son compartidos.
 
@@ -76,6 +77,7 @@ pnpm build
 7. Puertos locales propios (5391 / 8791).
 8. App instalable (manifest + ícono) y notificaciones push: quack y mensaje nuevo.
 9. Mascotas: barra de hambre, botón de alimentar con animación, sueño en 0 % y aviso de hambre.
+10. Contador de días compartido: suma cuando los dos alimentaron ese día (gema low poly arriba a la izquierda).
 
 ## Ideas pendientes
 

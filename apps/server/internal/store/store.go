@@ -25,6 +25,8 @@ type Data struct {
 	Subscriptions map[string][]webpush.Subscription `json:"subscriptions"`
 	// Hambre y monedas de cada pato.
 	Pets map[string]pet.State `json:"pets"`
+	// Contador de días compartido.
+	Together pet.Together `json:"together"`
 	// Patos a los que ya avisamos que tienen hambre (se reinicia al comer).
 	HungryNotified map[string]bool `json:"hungryNotified"`
 	// Llaves VAPID: se generan la primera vez que arranca el servidor.

@@ -1,6 +1,8 @@
 import { HUNGER, type DuckId } from "./config";
 import type { PetState } from "./net/protocol";
 
+// "en-CA" formatea como 2026-10-13, el mismo formato que manda el servidor.
+const TODAY = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Mexico_City" });
 const DECAY_PER_MS = 100 / (HUNGER.fullToEmptyHours * 3600 * 1000);
 
 /**
@@ -17,11 +19,22 @@ export class Pets {
   }
 
   set(duck: DuckId, s: PetState) {
-    this.states.set(duck, { level: s.level, at: s.at, coins: s.coins });
+    this.states.set(duck, {
+      level: s.level,
+      at: s.at,
+      coins: s.coins,
+      lastDay: s.lastDay ?? "", // el servidor anterior no lo mandaba
+    });
   }
 
   known(duck: DuckId) {
     return this.states.has(duck);
+  }
+
+  /** ¿Ya lo alimentaron hoy? (día de México, con la hora del servidor; igual que pet.Day en Go) */
+  fedToday(duck: DuckId): boolean {
+    const lastDay = this.states.get(duck)?.lastDay;
+    return !!lastDay && lastDay === TODAY.format(Date.now() + this.offset);
   }
 
   /** Hambre actual 0–100 (100 si todavía no sabemos). */

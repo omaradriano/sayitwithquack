@@ -44,12 +44,14 @@ export type ServerMessage =
       pets: Partial<Record<DuckId, PetState>>;
       /** hora del servidor (ms Unix) */
       now: number;
+      /** contador de días compartido (sube cuando los dos alimentaron ese día) */
+      days: number;
     }
   | { t: "presence"; online: DuckId[]; lastSeen: Partial<Record<DuckId, number>> }
   | ({ t: "state"; duck: DuckId } & DuckState)
   | ({ t: "config"; duck: DuckId } & DuckConfig)
   | QuackResult
-  | ({ t: "pet"; duck: DuckId; fed: boolean; seed: number; now: number } & PetState)
+  | ({ t: "pet"; duck: DuckId; fed: boolean; seed: number; now: number; days: number } & PetState)
   | { t: "feed-result"; reason: "full" | "coins" };
 
 /** Hambre: "nivel en el momento at". El hambre actual se calcula con el tiempo transcurrido. */
@@ -57,6 +59,8 @@ export interface PetState {
   level: number; // 0–100
   at: number; // ms Unix (hora del servidor)
   coins: number;
+  /** fecha local (México) de la última comida, "2026-10-13" */
+  lastDay: string;
 }
 
 /** Respuesta al botón de quack: a cuántos dispositivos se envió. */

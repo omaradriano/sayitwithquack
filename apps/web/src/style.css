@@ -44,6 +44,7 @@ body {
   content: "";
   width: 5px;
   height: 5px;
+  flex-shrink: 0; /* con mensajes largos el texto ocupa todo el ancho y aplastaba el punto */
   border-radius: 50%;
   background: currentColor;
 }
@@ -548,4 +549,94 @@ body.settings-open .settings-backdrop {
   from { transform: translateY(0) scale(0.6); opacity: 0; }
   20% { opacity: 1; transform: translateY(-8px) scale(1); }
   to { transform: translateY(-46px) scale(1); opacity: 0; }
+}
+
+/* ---------- Contador de días (gema low poly) ---------- */
+.days {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 8px);
+  left: 12px;
+  z-index: 5;
+  pointer-events: none;
+  /* la sombra va en el contenedor porque clip-path la recortaría */
+  filter: drop-shadow(0 3px 0 rgba(0, 0, 0, 0.18)) drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
+}
+
+.days-gem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 58px;
+  height: 52px;
+  padding-bottom: 2px;
+  /* polígono irregular + triángulos de colores duros que salen de un punto: caras planas */
+  clip-path: polygon(22% 0, 80% 4%, 100% 38%, 90% 86%, 46% 100%, 6% 84%, 0 30%);
+  background: conic-gradient(
+    from 10deg at 44% 42%,
+    #ffe27a 0deg 62deg,
+    #f7c948 62deg 118deg,
+    #e8a92c 118deg 176deg,
+    #d99424 176deg 228deg,
+    #f2b93a 228deg 290deg,
+    #ffd84d 290deg 360deg
+  );
+  color: #3a2a00;
+  text-align: center;
+  line-height: 1;
+}
+
+.days-number {
+  font-size: 20px;
+  font-weight: 800;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+.days-unit {
+  margin-top: 2px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.days-dots {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+/* Circulito por pato: punteado si aún no come hoy, con su color cuando ya comió. */
+.days-dot {
+  display: grid;
+  place-items: center;
+  width: 15px;
+  height: 15px;
+  border: 1.5px dashed rgba(255, 255, 255, 0.75);
+  border-radius: 50%;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 8px;
+  font-weight: 800;
+  transition: background 0.3s, transform 0.3s;
+}
+
+.days-dot.is-fed {
+  border: 1.5px solid #fff;
+  background: var(--duck);
+  color: var(--duck-text);
+  transform: scale(1.1);
+}
+
+.days.bump .days-gem {
+  animation: days-bump 0.6s ease-out;
+}
+
+@keyframes days-bump {
+  30% {
+    transform: scale(1.25) rotate(-6deg);
+  }
+  60% {
+    transform: scale(0.95) rotate(3deg);
+  }
 }

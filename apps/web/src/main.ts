@@ -9,6 +9,7 @@ import { Decor } from "./world/decor";
 import { Effects } from "./world/effects";
 import { Pets } from "./pets";
 import { FeedButton } from "./ui/feed-button";
+import { DaysCounter } from "./ui/days-counter";
 import { Swimmer, Couple } from "./behaviors/swim";
 import { DuckLabel, createLabelRenderer } from "./ui/labels";
 import { askForDuck } from "./ui/login";
@@ -164,6 +165,9 @@ function enterAs(me: DuckId, { swimmers, duckLabels, loop, pets, effects }: Worl
     feed: () => conn.send({ t: "feed" }),
   });
 
+  // Contador de días de los dos (arriba a la izquierda).
+  const daysCounter = new DaysCounter((duck) => pets.fedToday(duck));
+
   /** Pone "en línea" / "visto ..." en la etiqueta de cada pato. */
   function updateLabels(online: DuckId[], lastSeen: Partial<Record<DuckId, number>>) {
     for (const [id, label] of duckLabels) {
@@ -179,7 +183,7 @@ function enterAs(me: DuckId, { swimmers, duckLabels, loop, pets, effects }: Worl
       if (status === "offline") {
         // Sin conexión, el pato de tu pareja vuelve a nadar solo en tu pantalla.
         if (partner.mode === "remote") partner.releaseRemote();
-        presence.show(conn.replaced ? "Abriste el estanque en otro lado" : "Sin conexión, reintentando…", false);
+        presence.show(conn.replaced ? "Lo abriste en otro lado" : "Sin conexión, reintentando…", false);
       }
     },
     onMessage(msg) {
@@ -197,6 +201,7 @@ function enterAs(me: DuckId, { swimmers, duckLabels, loop, pets, effects }: Worl
               if (state && swimmers.has(id as DuckId)) pets.set(id as DuckId, state);
             }
             feedButton.refresh();
+            daysCounter.set(msg.days ?? 0);
             // Si este teléfono ya tenía notificaciones activas, lo volvemos a registrar.
             if (vapidKey) {
               existingSubscription(vapidKey).then((subscription) => {
@@ -228,6 +233,7 @@ function enterAs(me: DuckId, { swimmers, duckLabels, loop, pets, effects }: Worl
           pets.set(msg.duck, msg);
           if (msg.fed) effects.feed(swimmers.get(msg.duck)!, msg.seed);
           feedButton.refresh();
+          daysCounter.set(msg.days ?? 0);
           break;
         case "feed-result":
           feedButton.rejected(msg.reason);

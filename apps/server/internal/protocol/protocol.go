@@ -50,13 +50,16 @@ type Welcome struct {
 	// Hambre de cada pato y hora del servidor (para que el cliente calcule el hambre actual).
 	Pets map[string]PetState `json:"pets"`
 	Now  int64               `json:"now"`
+	// Contador de días compartido (sube cuando los dos alimentaron ese día).
+	Days int `json:"days"`
 }
 
 // PetState: hambre "nivel en el momento at". Igual que pet.State.
 type PetState struct {
-	Level float64 `json:"level"`
-	At    int64   `json:"at"`
-	Coins int     `json:"coins"`
+	Level   float64 `json:"level"`
+	At      int64   `json:"at"`
+	Coins   int     `json:"coins"`
+	LastDay string  `json:"lastDay"`
 }
 
 // Pet avisa que cambió el hambre de un pato. Fed = true: acaban de alimentarlo (animación).
@@ -67,6 +70,7 @@ type Pet struct {
 	Fed  bool  `json:"fed"`
 	Seed int   `json:"seed"` // para que las migajas caigan igual en ambos teléfonos
 	Now  int64 `json:"now"`
+	Days int   `json:"days"` // contador de días compartido
 }
 
 // FeedResult explica por qué no se pudo alimentar.

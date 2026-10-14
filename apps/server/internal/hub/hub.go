@@ -193,6 +193,7 @@ func (h *Hub) join(c *client) {
 		VapidKey: h.data.Vapid.Public,
 		Pets:     h.petsLocked(),
 		Now:      time.Now().UnixMilli(),
+		Days:     h.data.Together.Days,
 	})
 	h.broadcastLocked(h.presenceLocked(), c)
 }
@@ -269,12 +270,17 @@ func (h *Hub) feed(c *client) {
 	}
 	h.data.Pets[c.duck] = fed
 	h.data.HungryNotified[c.duck] = false
+	before := h.data.Together.Days
+	h.data.Together = h.data.Together.Update(h.data.Pets, h.ducks, now)
+	if h.data.Together.Days > before {
+		log.Printf("los dos alimentaron hoy: %d días", h.data.Together.Days)
+	}
 	h.saveLocked()
 	log.Printf("%s alimentó a su pato (%.0f%%)", c.duck, fed.Level)
 	// A todos, incluido quien alimentó: así la animación sale igual en ambos teléfonos.
 	msg := protocol.Pet{
 		T: "pet", Duck: c.duck, PetState: protocol.PetState(fed),
-		Fed: true, Seed: rand.IntN(1 << 30), Now: now.UnixMilli(),
+		Fed: true, Seed: rand.IntN(1 << 30), Now: now.UnixMilli(), Days: h.data.Together.Days,
 	}
 	h.broadcastLocked(msg, nil)
 }
